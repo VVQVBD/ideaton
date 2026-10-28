@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#060a18">
+  <title>Copilot Education Platform</title>
+  <script>try{var th=localStorage.getItem('theme');document.documentElement.dataset.theme=th==='light'?'light':'dark';}catch(e){document.documentElement.dataset.theme='dark';}</script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/fx.css">
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div id="app" class="app">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div class="center">
+      <header id="topbar" class="topbar"></header>
+      <main id="main" class="main"></main>
+    </div>
+    <aside id="panel" class="panel"></aside>
+  </div>
+  <button id="fab" class="fab" data-act="panel" type="button"></button>
+  <div id="scrim" class="scrim" data-act="panel"></div>
+  <div id="modal-root"></div>
+  <div id="toasts" class="toasts"></div>
+  <script src="vendor/gsap.min.js"></script>
+  <script src="vendor/confetti.min.js"></script>
+  <script src="js/fx.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

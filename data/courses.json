@@ -1,0 +1,26 @@
+[
+  {
+    "id": "c1",
+    "title": "Программирование",
+    "subtitle": "Основы Python · 2 семестр",
+    "icon": "code",
+    "color": "blue",
+    "type": "it"
+  },
+  {
+    "id": "c2",
+    "title": "Математика",
+    "subtitle": "Высшая математика · 1 семестр",
+    "icon": "sigma",
+    "color": "red",
+    "type": "math"
+  },
+  {
+    "id": "c3",
+    "title": "Английский для IT",
+    "subtitle": "Языковой курс · B1-B2",
+    "icon": "lang",
+    "color": "green",
+    "type": "language"
+  }
+]

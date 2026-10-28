@@ -1,0 +1,65 @@
+[
+  {
+    "id": "t1",
+    "name": "Айгерим Сарсенова",
+    "role": "teacher",
+    "title": "Преподаватель информатики",
+    "color": "#2563eb"
+  },
+  {
+    "id": "s1",
+    "name": "Виктория Ким",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#f97316"
+  },
+  {
+    "id": "s2",
+    "name": "Айдар Бекенов",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#10b981"
+  },
+  {
+    "id": "s3",
+    "name": "Мадина Серикова",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#8b5cf6"
+  },
+  {
+    "id": "s4",
+    "name": "Дамир Жумабаев",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#ec4899"
+  },
+  {
+    "id": "s5",
+    "name": "Алина Петрова",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#0ea5e9"
+  },
+  {
+    "id": "s6",
+    "name": "Нурлан Оспанов",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#eab308"
+  },
+  {
+    "id": "s7",
+    "name": "София Иванова",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#ef4444"
+  },
+  {
+    "id": "s8",
+    "name": "Арман Касымов",
+    "role": "student",
+    "group": "ПО 24-2",
+    "color": "#14b8a6"
+  }
+]

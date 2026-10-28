@@ -1,0 +1,74 @@
+[
+  {
+    "id": "g1",
+    "lessonId": "l1",
+    "stepId": "s5",
+    "studentId": "s6",
+    "type": "unclear",
+    "note": "Не объяснено, что такое break и continue: в теории только упоминание \"специальные операторы\"",
+    "date": "2026-10-01T09:00:00.000Z"
+  },
+  {
+    "id": "g2",
+    "lessonId": "l1",
+    "stepId": "s5",
+    "studentId": "s4",
+    "type": "unclear",
+    "note": "Непонятно, чем break отличается от continue, нет примера",
+    "date": "2026-10-05T09:00:00.000Z"
+  },
+  {
+    "id": "g3",
+    "lessonId": "l1",
+    "stepId": "s5",
+    "studentId": "s8",
+    "type": "unclear",
+    "note": "Просит пример с break, в уроке его нет",
+    "date": "2026-10-09T09:00:00.000Z"
+  },
+  {
+    "id": "g4",
+    "lessonId": "l1",
+    "stepId": "s1",
+    "studentId": "s3",
+    "type": "common_error",
+    "note": "Ожидала, что range(3) выведет 1, 2, 3: не акцентировано, что отсчёт идёт с нуля",
+    "date": "2026-10-13T09:00:00.000Z"
+  },
+  {
+    "id": "g5",
+    "lessonId": "l1",
+    "stepId": "s1",
+    "studentId": "s8",
+    "type": "common_error",
+    "note": "Ошибся в ответе: посчитал, что range(3) включает число 3",
+    "date": "2026-10-17T09:00:00.000Z"
+  },
+  {
+    "id": "g6",
+    "lessonId": "l1",
+    "stepId": "s3",
+    "studentId": "s4",
+    "type": "unclear",
+    "note": "Не понял, как именно while заканчивается, нужен пошаговый разбор значений n",
+    "date": "2026-10-21T09:00:00.000Z"
+  },
+  {
+    "id": "gmvrxxxif9o8",
+    "lessonId": "l2",
+    "stepId": "s1",
+    "studentId": "s1",
+    "type": "unclear",
+    "note": "Шаг 1: студент не понял материал, спросил \"Не понял что такое else\". Стоит добавить пояснение или пример",
+    "date": "2026-10-28T09:57:39.687Z"
+  },
+  {
+    "id": "gmvrxyv8k2ts",
+    "lessonId": "l2",
+    "stepId": "s1",
+    "studentId": "s1",
+    "type": "unclear",
+    "note": "Шаг 1: студент не понял материал, спросил \"Не понял что такое else\". Стоит добавить пояснение или пример",
+    "date": "2026-10-28T09:58:23.397Z"
+  }
+]
