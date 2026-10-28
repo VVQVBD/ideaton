@@ -228,5 +228,10 @@ app.get('/api/config', (req, res) => res.json({ mock: ai.isMock(), hasKey: ai.ha
 app.post('/api/config', (req, res) => { ai.setMock(!!req.body.mock); res.json({ mock: ai.isMock() }); });
 app.post('/api/reset', (req, res) => { seed(); res.json({ ok: true }); });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Платформа запущена: http://localhost:${PORT} (MOCK_AI=${ai.isMock()})`));
+// Локально запускаем сервер сами, на Vercel он вызывает приложение как функцию
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`Платформа запущена: http://localhost:${PORT} (MOCK_AI=${ai.isMock()})`));
+}
+
+module.exports = app;
