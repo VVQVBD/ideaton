@@ -11,9 +11,10 @@ const provider = () => (process.env.AI_PROVIDER || 'gemini').toLowerCase();
 const hasKey = () => !!(provider() === 'openai' ? process.env.OPENAI_API_KEY : process.env.GEMINI_API_KEY);
 
 // ---------- Gemini (обычный HTTP-запрос, отдельные пакеты не нужны) ----------
-async function geminiJSON(messages) {
+async function geminiJSON(messages, backup) {
   if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY не задан в .env');
-  const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  // backup - последняя попытка: если задана запасная модель (GEMINI_FALLBACK_MODEL), пробуем её
+  const model = (backup && process.env.GEMINI_FALLBACK_MODEL) || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
   // Gemini: роли user/model, диалог начинается с user, одинаковые роли подряд склеиваем
   const contents = [];
@@ -57,15 +58,18 @@ async function openaiJSON(messages) {
   return JSON.parse(res.choices[0].message.content);
 }
 
-// Запрос к ИИ, который обязан вернуть JSON. При невалидном JSON повторяем один раз
-async function askJSON(messages, attempts = 2) {
+// Запрос к ИИ, который обязан вернуть JSON. При ошибке пробуем ещё раз.
+// Если модель перегружена (503, 500), ждём перед повтором: такие всплески обычно проходят за секунды
+async function askJSON(messages, attempts = 3) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await (provider() === 'openai' ? openaiJSON(messages) : geminiJSON(messages));
+      const last = i === attempts - 1;
+      return await (provider() === 'openai' ? openaiJSON(messages) : geminiJSON(messages, last));
     } catch (e) {
       lastErr = e;
       if (/\b(400|401|403|404|429)\b/.test(e.message) || /не задан|aborted/.test(e.message)) break; // повтор не поможет
+      if (/\b(500|503)\b/.test(e.message) && i < attempts - 1) await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
     }
   }
   throw lastErr;
