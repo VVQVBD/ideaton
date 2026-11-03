@@ -349,3 +349,29 @@ button, [data-act], .filter, .nav-item, .lesson-card, .course-card, .stat-card, 
   .table tr.me td { background: none; }
   .table tr.me { background: rgba(139, 109, 255, 0.18); border-radius: 14px; }
 }
+
+/* ---------- Открытый урок: ожидание и текущий замок ---------- */
+.wait-dots i { animation: blink 1.2s infinite; }
+.wait-dots i:nth-child(2) { animation-delay: .2s; } .wait-dots i:nth-child(3) { animation-delay: .4s; }
+.lock-node.cur .lock-ic { animation: fabPulse 2.4s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .wait-dots i, .lock-node.cur .lock-ic { animation: none; }
+}
+@media (max-width: 1180px) {
+  .role-badge { order: 5; flex: 1 1 100%; max-width: none; justify-content: center; }
+  .auth-top .logo { display: flex; font-size: 18px; }
+}
+@media (max-width: 760px) {
+  .g-opts, .team-pick { grid-template-columns: minmax(0, 1fr); }
+  .g-q .g-qtext { font-size: 22px; }
+  .g-code b { font-size: 34px; }
+  .g-sort { grid-template-columns: minmax(0, 1fr); }
+  .seg button { flex: 1 1 auto; }
+  .g-row { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+  .g-row .progress { display: none; }
+  .g-list .g-qrow { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .g-list .g-qrow .g-locks { grid-column: 1 / -1; }
+  .lock-node small { font-size: 10.5px; }
+  .g-locks.big .lock-ic { width: 44px; height: 44px; border-radius: 14px; }
+  .auth-card { padding: 22px 18px; }
+}

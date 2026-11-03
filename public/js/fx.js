@@ -305,6 +305,13 @@
     }
   }
 
+  // ---------- Открытый урок: замок открылся ----------
+  function unlock(el) {
+    if (!ok() || !el) return;
+    fromTo(el, { scale: 0.4, rotation: -25 }, { scale: 1, rotation: 0, duration: 0.7, ease: 'back.out(2.5)', clearProps: 'transform' });
+    burstAt(el, 24);
+  }
+
   // ---------- Глобальные эффекты: наклон карточек, подсветка hero, волна на кнопках ----------
   const TILT = '.lesson-card, .course-card, .stat-card, .pod';
   const MAG = '.btn.lg';
@@ -369,5 +376,5 @@
     rt = setTimeout(() => { last.nav = null; last.role = null; nav(); role(); }, 150);
   });
 
-  window.FX = { enter, nav, role, panel, stream, step, feedback, result, podium, reveal, swapText, bell, confetti, burstAt, celebrate, countUps, ok };
+  window.FX = { enter, nav, role, panel, stream, step, feedback, result, podium, reveal, swapText, bell, confetti, burstAt, celebrate, countUps, unlock, ok };
 })();

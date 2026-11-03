@@ -11,7 +11,8 @@
   };
 
   const S = {
-    role: store.get('role', 'student'),
+    role: 'student', // роль и команда берутся из сессии входа (applySession)
+    session: null, token: null, team: null,
     studentId: store.get('studentId', 's1'),
     lang: store.get('lang', 'ru'),
     page: 'home', param: null, dict: {}, users: [], courses: [],
@@ -29,10 +30,20 @@
   }
 
   async function api(url, body, method) {
-    const opt = body !== undefined ? { method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {};
+    const headers = {};
+    if (S.token) headers['x-teacher-token'] = S.token; // токен преподавателя после входа по PIN
+    const opt = { headers };
+    if (body !== undefined) { opt.method = method || 'POST'; headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    else if (method) opt.method = method;
     const r = await fetch(url, opt);
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || 'Ошибка ' + r.status);
+    if (!r.ok) {
+      const err = new Error(j.error || 'Ошибка ' + r.status);
+      err.status = r.status;
+      // Сервер перезапустили и забыл вход преподавателя: просим войти снова
+      if (r.status === 401 && S.token) setTimeout(() => handlers.logout(), 0);
+      throw err;
+    }
     return j;
   }
 
@@ -87,13 +98,21 @@
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>',
     moon: '<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>',
     board: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20l4-4 4 4"/>',
+    shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+    flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+    unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/>',
+    logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
   };
   const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
 
   const ring = (p, big = false) => `<svg class="ring ${big ? 'big' : ''}" viewBox="0 0 36 36"><defs><linearGradient id="rg${big ? 'b' : 's'}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><circle class="trk" cx="18" cy="18" r="15.9" fill="none" stroke-width="3.4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="url(#rg${big ? 'b' : 's'})" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${p} ${100 - p}" transform="rotate(-90 18 18)"/></svg>`;
 
   // ---------- Помощники по данным ----------
-  const me = () => (S.role === 'teacher' ? S.users.find((u) => u.role === 'teacher') : S.users.find((u) => u.id === S.studentId)) || { name: '?', color: '#999' };
+  const me = () => (S.team ? { id: S.team.teamId, name: S.team.name, color: S.team.color }
+    : S.role === 'teacher' ? S.users.find((u) => u.role === 'teacher') : S.users.find((u) => u.id === S.studentId)) || { name: '?', color: '#999' };
+  // Кто проходит уроки: команда (в игре) или студент (демо-вход)
+  const learnerId = () => (S.team ? S.team.teamId : S.studentId);
   const firstName = (n) => String(n || '').split(' ')[0];
   const initials = (n) => String(n || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const avatar = (u, cls = '') => `<span class="avatar ${cls}" style="background:${esc(u.color || '#2563eb')}">${esc(initials(u.name))}</span>`;
@@ -140,14 +159,19 @@
   }
 
   function route() {
+    if (A) return; // пока открыт экран входа, страницы не показываем
     const parts = location.hash.replace(/^#\/?/, '').split('/');
-    let page = parts[0] || 'home';
-    if (!['home', 'lessons', 'courses', 'rating', 'lesson', 'create'].includes(page)) page = 'home';
+    const inGame = S.role === 'teacher' || !!S.team;
+    let page = parts[0] || (S.team ? 'game' : 'home');
+    if (!['home', 'lessons', 'courses', 'rating', 'lesson', 'create', 'game'].includes(page)) page = 'home';
     if (page === 'create' && S.role !== 'teacher') page = 'home';
+    if (page === 'game' && !inGame) page = 'home';
+    if (S.team && ['home', 'courses'].includes(page)) page = 'game';
     S.page = page;
     S.param = parts[1] || null;
     S.nav++;
     P = null;
+    stopGame();
     togglePanel(false);
     renderSidebar();
     renderTop();
@@ -157,7 +181,10 @@
 
   // ---------- Каркас ----------
   function renderSidebar() {
-    const items = [['home', 'home'], ['lessons', 'lessons'], ['courses', 'folder'], ['rating', 'trophy']];
+    // Команде нужны только игра, уроки и рейтинг; преподавателю добавляем экран открытого урока
+    const items = S.team ? [['game', 'flag'], ['lessons', 'lessons'], ['rating', 'trophy']]
+      : [['home', 'home'], ['lessons', 'lessons'], ['courses', 'folder'], ['rating', 'trophy']];
+    if (S.role === 'teacher') items.splice(1, 0, ['game', 'flag']);
     const active = S.page === 'lesson' || S.page === 'create' ? 'lessons' : S.page;
     $('#sidebar').innerHTML = `
       <div class="logo"><span>${esc(t('brand'))}</span></div>
@@ -173,18 +200,16 @@
   function setTheme(v) {
     document.documentElement.dataset.theme = v;
     store.set('theme', v);
-    renderTop();
+    if (A) renderAuth(); else renderTop();
   }
 
   function renderTop() {
     const u = me();
+    // Вместо переключателя ролей - метка, кто вошёл. Сменить роль можно только через "Выйти"
+    const badge = S.team ? ['users', t('role.team') + ' «' + S.team.name + '»'] : S.role === 'teacher' ? ['board', t('role.teacher')] : ['grad', t('role.student')];
     $('#topbar').innerHTML = `
       <div class="brand-top">${esc(t('brand'))}</div>
-      <div class="role-switch">
-        <span class="role-thumb"></span>
-        <button class="role-btn ${S.role === 'student' ? 'active' : ''}" data-act="role" data-v="student">${ic('grad')}${esc(t('role.student'))}</button>
-        <button class="role-btn ${S.role === 'teacher' ? 'active' : ''}" data-act="role" data-v="teacher">${ic('board')}${esc(t('role.teacher'))}</button>
-      </div>
+      <span class="role-badge">${ic(badge[0])}${esc(badge[1])}</span>
       <label class="search">${ic('search')}<input id="q" type="text" placeholder="${esc(t('search'))}" value="${esc(S.query)}"></label>
       <div class="lang-switch">
         <button class="${S.lang === 'ru' ? 'active' : ''}" data-act="lang" data-v="ru">RU</button>
@@ -202,7 +227,7 @@
     main.scrollTop = 0;
     main.innerHTML = loading();
     main.setAttribute('aria-busy', 'true');
-    const pages = { home: pageHome, lessons: pageLessons, courses: pageCourses, rating: pageRating, lesson: pageLesson, create: pageCreate };
+    const pages = { home: pageHome, lessons: pageLessons, courses: pageCourses, rating: pageRating, lesson: pageLesson, create: pageCreate, game: pageGame };
     Promise.resolve(pages[S.page](tok)).then(() => {
       if (tok !== S.nav) return;
       main.removeAttribute('aria-busy');
@@ -316,7 +341,7 @@
 
   // ---------- Уроки ----------
   async function pageLessons(tok) {
-    const url = '/api/lessons' + (S.role === 'student' ? '?studentId=' + S.studentId : '');
+    const url = '/api/lessons' + (S.role === 'student' ? '?studentId=' + learnerId() : '');
     const all = await api(url);
     if (stale(tok)) return;
     const q = S.query.trim().toLowerCase();
@@ -378,7 +403,7 @@
     const rows = d.rows;
     const top = rows.slice(0, 3);
     const rest = rows.slice(3);
-    const mine = S.role === 'student' ? rows.find((r) => r.userId === S.studentId) : null;
+    const mine = S.role === 'student' && !S.team ? rows.find((r) => r.userId === S.studentId) : null;
     const medal = (r) => `<div class="pcol" data-rank="${r.rank}">${r.rank === 1 ? `<span class="crown" aria-hidden="true">${CROWN}</span>` : ''}<div class="pod p${r.rank} ${mine && mine.userId === r.userId ? 'me-pod' : ''}">
       <div class="medal">${r.rank}</div>${avatar({ name: r.name, color: r.color }, 'lg')}
       <div class="nm">${esc(r.name)}</div><div class="muted" style="font-size:13px">${esc(r.group || '')}</div>
@@ -388,7 +413,7 @@
     const order = [top[1], top[0], top[2]].filter(Boolean);
 
     let hint = '';
-    if (S.role === 'student') {
+    if (S.role === 'student' && !S.team) {
       if (!mine) hint = `<div class="note-box hl">${esc(t('r.notyet'))}</div>`;
       else if (mine.rank <= 3) hint = `<div class="note-box hl">${esc(t('r.intop', { rank: mine.rank }))}</div>`;
       else {
@@ -437,7 +462,7 @@
       ${lesson.notes ? `<div class="section-head"><h2>${esc(t('notes.title'))}</h2>${notesLink(lesson)}</div><div class="card">${notesHtml(lesson.notes)}</div>` : ''}
       <div class="section-head"><h2>${esc(t('gaps.title'))}</h2><span class="chip ${gaps.length ? 'red' : 'green'}">${gaps.length}</span></div>
       <div class="card">${gaps.length ? gaps.map((g) => {
-        const u = users.find((x) => x.id === g.studentId) || { name: '?', color: '#999' };
+        const u = users.find((x) => x.id === g.studentId) || { name: g.who || '?', color: '#999' };
         const idx = lesson.steps.findIndex((s) => s.id === g.stepId) + 1;
         return `<div class="task" style="cursor:default;align-items:flex-start">${avatar(u, 'sm')}<div class="info"><b>${esc(u.name)} · ${esc(t('step'))} ${idx}</b><span style="display:block;margin-top:2px">${esc(g.note)}</span></div><span class="chip ${g.type === 'unclear' ? 'orange' : 'red'}">${esc(t('gaptype.' + g.type))}</span></div>`;
       }).join('') : `<div class="empty">${esc(t('gaps.none'))}</div>`}</div>
@@ -476,7 +501,7 @@
         <p style="font-size:19px;margin-bottom:6px">${esc(msg)}</p>
         ${r.rank ? `<p class="muted">${esc(t('res.rank', { rank: r.rank, total: r.total, pts: r.points }))}</p>` : ''}
         <div class="row" style="justify-content:center;margin-top:22px">
-          <button class="btn" data-act="nav" data-v="rating">${ic('trophy')}${esc(t('res.toRating'))}</button>
+          ${r.team ? `<button class="btn" data-act="nav" data-v="game">${ic('flag')}${esc(t('g.back'))}</button>` : `<button class="btn" data-act="nav" data-v="rating">${ic('trophy')}${esc(t('res.toRating'))}</button>`}
           <button class="btn ghost" data-act="nav" data-v="lessons">${esc(t('res.toLessons'))}</button></div></div>`;
       return;
     }
@@ -555,7 +580,13 @@
     // Последний шаг пройден: сохраняем попытку
     try {
       const answers = Object.entries(P.answers).map(([stepId, a]) => ({ stepId, score: a.score, tries: a.tries }));
-      P.finished = await api('/api/attempts', { lessonId: P.lesson.id, studentId: S.studentId, answers });
+      if (S.team) {
+        // В игре оценка за урок идёт в счёт команды, а не в личный рейтинг
+        const r = await api('/api/game/lesson', { code: S.team.code, teamId: S.team.teamId, answers });
+        P.finished = { attempt: { score: r.score }, team: true };
+      } else {
+        P.finished = await api('/api/attempts', { lessonId: P.lesson.id, studentId: S.studentId, answers });
+      }
       renderPlayer();
       fx('result', P.finished.attempt.score);
     } catch (e) { toast(e.message); }
@@ -594,7 +625,7 @@
     P.busy = true;
     renderChat();
     try {
-      const res = await api('/api/chat', { lessonId: P.lesson.id, stepId: curStep() ? curStep().id : null, studentId: S.studentId, message: text || '', action: action || null, history, language: S.lang });
+      const res = await api('/api/chat', { lessonId: P.lesson.id, stepId: curStep() ? curStep().id : null, studentId: learnerId(), who: S.team ? S.team.name : undefined, message: text || '', action: action || null, history, language: S.lang });
       P.chat.push({ role: 'bot', stream: true, text: res.reply, gap: res.gapSaved });
       if (res.mode === 'fallback') toast(t('ai.fallback'));
     } catch (e) {
@@ -618,6 +649,7 @@
     if (fab) { fab.innerHTML = ic('sparkle'); fab.setAttribute('aria-label', t('panel.open')); }
     const isLesson = S.page === 'lesson' && S.role === 'student' && P;
     const head = `<div class="cop-head"><div class="cop-logo"><img class="cop-img" src="img/copilot.svg" alt="" hidden onerror="this.onerror=null;this.src='img/copilot.png'" onload="this.hidden=false;this.nextElementSibling.style.display='none';this.parentNode.classList.add('has-img')">${ic('sparkle')}</div><div style="flex:1"><b>${esc(t('cop.name'))}</b><span class="online"><i></i>${esc(t('cop.online'))}</span></div><span class="badge-mode ${S.config.mock ? '' : 'gpt'}">${esc(t(S.config.mock ? 'mode.demo' : 'mode.gpt'))}</span><button class="cop-close" data-act="panel" aria-label="${esc(t('panel.close'))}">${ic('close')}</button></div>`;
+    if (S.page === 'game') { $('#panel').innerHTML = gamePanel(head); return; }
     if (isLesson) {
       $('#panel').innerHTML = `<div class="copilot">${head}<div id="chat" class="chat"></div>
         <div class="quick"><button data-act="quick" data-v="simpler">${ic('bulb')}${esc(t('chat.simpler'))}</button><button data-act="quick" data-v="hint">${ic('file')}${esc(t('chat.hint'))}</button></div>
@@ -745,15 +777,398 @@
     } catch (e) { toast(e.message); }
   }
 
+  // ---------- Вход: студенты по коду игры, преподаватель по PIN на /teacher ----------
+  const isTeacherPath = () => location.pathname.replace(/\/+$/, '') === '/teacher';
+  let A = null; // состояние экрана входа (null - экран закрыт)
+
+  // Сессия: { role: 'teacher', token } | { role: 'team', code, teamId, name, color } | { role: 'student', studentId }
+  function applySession(sess) {
+    S.session = sess;
+    S.role = sess && sess.role === 'teacher' ? 'teacher' : 'student';
+    S.token = sess && sess.token ? sess.token : null;
+    S.team = sess && sess.role === 'team' ? sess : null;
+    if (sess && sess.studentId) S.studentId = sess.studentId;
+  }
+  function saveSession(sess) { store.set('session', JSON.stringify(sess)); applySession(sess); }
+  function readSession() { try { return JSON.parse(store.get('session', 'null')); } catch (e) { return null; } }
+
+  // Сохранённый вход ещё действует? Иначе вернём null и покажем экран входа
+  async function checkSession(sess) {
+    if (!sess || !sess.role) return null;
+    try {
+      if (sess.role === 'teacher') {
+        S.token = sess.token;
+        const r = await api('/api/teacher/check');
+        S.token = null;
+        return r.ok ? sess : null;
+      }
+      if (sess.role === 'team') {
+        const r = await api('/api/game?code=' + encodeURIComponent(sess.code));
+        return r.game ? sess : null;
+      }
+      return sess;
+    } catch (e) { S.token = null; return null; }
+  }
+
+  function showAuth(mode) {
+    stopGame();
+    closeModal();
+    A = { mode: mode || (isTeacherPath() ? 'teacher' : 'code'), code: '', game: null, teamId: null, members: '', studentId: S.studentId };
+    document.body.classList.add('auth-mode');
+    renderAuth();
+  }
+
+  function enterApp() {
+    A = null;
+    document.body.classList.remove('auth-mode');
+    $('#auth').innerHTML = '';
+    C = null; P = null;
+    const page = S.role === 'teacher' || S.team ? 'game' : 'home';
+    history.replaceState(null, '', '/#/' + page);
+    route();
+  }
+
+  function renderAuth() {
+    if (!A) return;
+    const top = `<div class="auth-top"><div class="logo"><span>${esc(t('brand'))}</span></div><div class="row">
+      <div class="lang-switch"><button class="${S.lang === 'ru' ? 'active' : ''}" data-act="lang" data-v="ru">RU</button><button class="${S.lang === 'kk' ? 'active' : ''}" data-act="lang" data-v="kk">KZ</button></div>
+      <button class="icon-btn" data-act="theme" title="${esc(t('theme.toggle'))}" aria-label="${esc(t('theme.toggle'))}">${ic(curTheme() === 'dark' ? 'sun' : 'moon')}</button></div></div>`;
+    const back = (to) => `<button class="link-btn" data-act="authMode" data-v="${to}">${ic('back')}${esc(t('auth.back'))}</button>`;
+    let body;
+    if (A.mode === 'teacher') {
+      body = `<span class="chip">${ic('board')}${esc(t('auth.teacher.chip'))}</span>
+        <h1 class="h1">${esc(t('auth.teacher.title'))}</h1><p class="muted">${esc(t('auth.teacher.sub'))}</p>
+        <label class="field-l">${esc(t('auth.pin'))}<input id="a-pin" type="password" inputmode="numeric" autocomplete="current-password"></label>
+        <button class="btn lg block" data-act="authTeacher">${esc(t('auth.enter'))}${ic('arrow')}</button>
+        <div class="auth-links"><a class="link-btn" href="/">${ic('grad')}${esc(t('auth.toStudent'))}</a></div>`;
+    } else if (A.mode === 'team') {
+      body = `<span class="chip">${esc(t('g.code'))}: ${esc(A.code)}</span>
+        <h1 class="h1">${esc(t('auth.team.title'))}</h1>
+        <div class="team-pick">${A.game.teams.map((tm) => `<button class="team-btn ${A.teamId === tm.id ? 'active' : ''}" data-act="authTeam" data-v="${esc(tm.id)}" style="--tc:${esc(tm.color)}">
+          <span class="g-dot"></span><b>${esc(tm.name)}</b>${tm.joined ? `<small>${esc(t('auth.team.joined'))}</small>` : ''}</button>`).join('')}</div>
+        <label class="field-l">${esc(t('auth.members'))}<input id="a-members" data-auth="members" autocomplete="off" placeholder="${esc(t('auth.members.ph'))}" value="${esc(A.members)}"></label>
+        <button class="btn lg block" data-act="authJoin" ${A.teamId ? '' : 'disabled'}>${ic('users')}${esc(t('auth.join'))}</button>
+        <div class="auth-links">${back('code')}</div>`;
+    } else if (A.mode === 'demo') {
+      const students = S.users.filter((u) => u.role === 'student');
+      body = `<span class="chip gray">${esc(t('auth.student.chip'))}</span>
+        <h1 class="h1">${esc(t('auth.demo.title'))}</h1><p class="muted">${esc(t('auth.demo.sub'))}</p>
+        <select class="select" data-auth="studentId" aria-label="${esc(t('set.student'))}">${students.map((u) => `<option value="${esc(u.id)}" ${u.id === A.studentId ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select>
+        <button class="btn lg block" data-act="authDemo">${esc(t('auth.enter'))}${ic('arrow')}</button>
+        <div class="auth-links">${back('code')}</div>`;
+    } else {
+      body = `<span class="chip">${ic('grad')}${esc(t('auth.student.chip'))}</span>
+        <h1 class="h1">${esc(t('auth.student.title'))}</h1><p class="muted">${esc(t('auth.code.sub'))}</p>
+        <input id="a-code" class="code-input" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="${esc(t('auth.code.ph'))}" placeholder="0000" value="${esc(A.code)}">
+        <button class="btn lg block" data-act="authCode">${esc(t('auth.next'))}${ic('arrow')}</button>
+        <div class="auth-links"><button class="link-btn" data-act="authMode" data-v="demo">${esc(t('auth.noCode'))}</button><a class="link-btn" href="/teacher">${ic('board')}${esc(t('auth.toTeacher'))}</a></div>`;
+    }
+    $('#auth').innerHTML = top + `<div class="auth-card card">${body}</div>`;
+    const first = $('#a-code') || $('#a-pin');
+    if (first) first.focus();
+    // Карточка плавно появляется только при смене шага, а не при каждом клике
+    if (A.shown !== A.mode) { A.shown = A.mode; fx('reveal', '.auth-card'); }
+  }
+
+  // ---------- Открытый урок (командная игра) ----------
+  // G - состояние экрана игры. Сервер опрашивается раз в 1,5 секунды, экран перерисовывается только при изменениях
+  const G = { state: null, prev: null, poll: null, tick: null, key: '', count: 4, sel: {}, picked: {}, num: '', fb: null, offset: 0, busy: false };
+  const LETTERS = ['A', 'B', 'C', 'D'];
+
+  function stopGame() { clearInterval(G.poll); clearInterval(G.tick); G.poll = null; G.tick = null; }
+
+  async function fetchGame() {
+    const q = S.team ? '?code=' + encodeURIComponent(S.team.code) + '&teamId=' + encodeURIComponent(S.team.teamId) : '';
+    const r = await api('/api/game' + q);
+    if (r.game) G.offset = r.game.now - Date.now(); // разница часов телефона и сервера, нужна для таймера
+    return r.game;
+  }
+
+  async function pageGame(tok) {
+    let g;
+    try { g = await fetchGame(); } catch (e) {
+      if (S.team && e.status === 404) { toast(t('g.gone')); handlers.logout(); return; }
+      throw e;
+    }
+    if (stale(tok)) return;
+    G.state = g; G.prev = null; G.key = '';
+    renderGame();
+    G.poll = setInterval(pollGame, 1500);
+    G.tick = setInterval(tickTimer, 250);
+  }
+
+  async function pollGame() {
+    if (S.page !== 'game') { stopGame(); return; }
+    if (G.busy) return;
+    try {
+      G.state = await fetchGame();
+      renderGame();
+    } catch (e) {
+      // Преподаватель создал новую игру: старый код больше не действует
+      if (S.team && e.status === 404) { stopGame(); toast(t('g.gone')); handlers.logout(); }
+    }
+  }
+
+  // Что важно для перерисовки. Команде не перерисовываем экран из-за чужих очков (их показывает таблица)
+  function viewKey(g) {
+    if (!g) return 'none';
+    if (S.role === 'teacher') return JSON.stringify({ ...g, now: 0 });
+    return JSON.stringify({ p: g.phase, i: g.quiz.idx, c: g.quiz.closed, me: g.me, l: (g.teams.find((x) => x.id === g.me.id) || {}).lesson, f: g.phase === 'finish' ? g.teams : 0 });
+  }
+
+  function renderGame(force) {
+    if (S.page !== 'game') return;
+    const g = G.state;
+    const key = viewKey(g);
+    if (!force && key === G.key && $('#g-body')) {
+      const board = $('#g-board');
+      if (board && g) board.innerHTML = boardHtml(g);
+      G.prev = g;
+      return;
+    }
+    G.key = key;
+    $('#main').innerHTML = S.role === 'teacher' ? teacherGameHtml(g) : teamGameHtml(g);
+    tickTimer();
+    renderPanel();
+    gameFx(G.prev, g);
+    G.prev = g;
+  }
+
+  // Анимации на смену событий: открыт замок, верный ответ, итоги
+  function gameFx(prev, g) {
+    if (!g) return;
+    if (g.phase === 'finish' && (!prev || prev.phase !== 'finish')) { fx('podium'); setTimeout(() => fx('celebrate', 'big'), 1600); return; }
+    if (!prev || !g.me || !prev.me) {
+      if (prev && S.role === 'teacher' && g.quiz.closed && !prev.quiz.closed) fx('reveal', '.g-opt');
+      return;
+    }
+    const was = prev.me.locks.filter((x) => x.open).length;
+    const now = g.me.locks.filter((x) => x.open).length;
+    if (now > was) {
+      fx('unlock', $('.lock-node.just'));
+      fx('celebrate', now === g.me.locks.length ? 'big' : 'small');
+    }
+    if (g.quiz.closed && !prev.quiz.closed && g.me.quiz && g.me.quiz.points > 0) fx('celebrate', 'small');
+  }
+
+  function tickTimer() {
+    const q = G.state && G.state.quiz;
+    const el = $('#g-sec');
+    if (!el || !q || !q.endsAt) return;
+    const left = Math.max(0, (q.endsAt - (Date.now() + G.offset)) / 1000);
+    el.textContent = Math.ceil(left);
+    el.classList.toggle('low', left <= 5);
+    const bar = $('#g-bar');
+    if (bar) bar.style.width = (left / q.seconds) * 100 + '%';
+  }
+
+  const sortedTeams = (g) => g.teams.slice().sort((a, b) => b.score - a.score);
+  const timerHtml = (q) => (q.closed ? `<span class="chip orange">${esc(t('g.closed'))}</span>`
+    : `<div class="g-timer" role="timer"><b id="g-sec">${q.seconds}</b><div class="progress"><i id="g-bar" style="width:100%"></i></div></div>`);
+
+  // Таблица счёта команд
+  function boardHtml(g) {
+    const list = sortedTeams(g);
+    const max = Math.max(1, ...list.map((x) => x.score));
+    return `<div class="section-head"><h2>${esc(t('g.board'))}</h2></div><div class="card g-board-card">${list.map((tm, i) => `
+      <div class="g-row ${S.team && tm.id === S.team.teamId ? 'me' : ''} ${tm.joined ? '' : 'off'}">
+        <span class="g-place">${i + 1}</span><span class="g-dot" style="--tc:${esc(tm.color)}"></span><b class="g-name">${esc(tm.name)}</b>
+        <div class="progress" role="img" aria-label="${esc(tm.name)}: ${tm.score}"><i style="width:${Math.round((tm.score / max) * 100)}%;background:${esc(tm.color)}"></i></div>
+        <b class="g-pts">${tm.score}</b></div>`).join('')}</div>`;
+  }
+
+  // Цепочка из 5 замков. n - сколько открыто
+  function lockMap(g, n, withTitles) {
+    return `<div class="g-locks ${withTitles ? 'big' : ''}">${g.quest.locks.map((l, i) => `
+      <div class="lock-node ${i < n ? 'open' : i === n ? 'cur' : ''} ${i === n - 1 ? 'just' : ''}" title="${esc(l.title)}">
+        <span class="lock-ic">${ic(i < n ? 'unlock' : 'lock')}</span>${withTitles ? `<small>${esc(l.title)}</small>` : ''}</div>`).join('')}</div>`;
+  }
+
+  // Подиум команд на этапе итогов
+  function teamPodium(g) {
+    const list = sortedTeams(g).filter((x) => x.joined || x.score > 0);
+    const top = list.slice(0, 3);
+    const order = [top[1], top[0], top[2]].filter(Boolean);
+    return `<div class="podium">${order.map((tm) => {
+      const r = top.indexOf(tm) + 1;
+      return `<div class="pcol" data-rank="${r}">${r === 1 ? `<span class="crown" aria-hidden="true">${CROWN}</span>` : ''}<div class="pod p${r} ${S.team && tm.id === S.team.teamId ? 'me-pod' : ''}">
+        <div class="medal">${r}</div>${avatar({ name: tm.name, color: tm.color }, 'lg')}
+        <div class="nm">${esc(tm.name)}</div><div class="muted" style="font-size:13px">${esc(tm.members || '')}</div>
+        <div class="pts">${tm.score}</div>
+        <div class="muted" style="font-size:13px">${esc(t('g.parts', { q: tm.quizScore, l: tm.lesson ? tm.lesson.score : 0, k: tm.questScore }))}</div></div><div class="ped" aria-hidden="true">${r}</div></div>`;
+    }).join('')}</div>`;
+  }
+
+  // ----- Экран преподавателя (его удобно вывести на проектор) -----
+  function teacherGameHtml(g) {
+    if (!g) {
+      return `<h1 class="page-title">${esc(t('g.title'))}</h1><p class="page-sub">${esc(t('g.sub'))}</p>
+        <div class="card g-setup" style="margin-top:20px">
+          <ol class="g-how">${[1, 2, 3, 4].map((i) => `<li><span class="num">${i}</span>${esc(t('g.how' + i))}</li>`).join('')}</ol>
+          <div class="field-l">${esc(t('g.teams'))}</div>
+          <div class="filters g-count">${[2, 3, 4, 5, 6].map((n) => `<button class="filter ${G.count === n ? 'active' : ''}" data-act="gCount" data-v="${n}">${n}</button>`).join('')}</div>
+          <div><button class="btn lg" data-act="gCreate">${ic('sparkle')}${esc(t('g.create'))}</button></div></div>`;
+    }
+    const url = (S.config.lan && S.config.lan[0]) || location.origin;
+    const pi = g.phases.indexOf(g.phase);
+    const head = `<div class="g-head"><div><h1 class="h1">${esc(t('g.title'))}</h1><div class="muted g-url">${esc(t('g.join', { url }))}</div></div>
+      <div class="g-code"><small>${esc(t('g.code'))}</small><b>${esc(g.code)}</b></div></div>
+      <div class="g-steps">${g.phases.map((p, i) => `<button class="g-step ${i === pi ? 'now' : i < pi ? 'done' : ''}" data-act="gPhase" data-v="${p}"><span>${i < pi ? ic('check') : i + 1}</span>${esc(t('g.ph.' + p))}</button>`).join('')}</div>`;
+    const q = g.quiz;
+    const btn = (act, label, icon, v) => `<button class="btn lg" data-act="${act}" ${v ? `data-v="${v}"` : ''}>${ic(icon || 'arrow')}${esc(t(label))}</button>`;
+    let body = '';
+    if (g.phase === 'lobby') {
+      body = `<div class="grid c3 g-teams">${g.teams.map((tm) => `<div class="card g-team ${tm.joined ? 'on' : ''}" style="--tc:${esc(tm.color)}">
+          <span class="g-dot"></span><div><b>${esc(tm.name)}</b><div class="muted">${esc(tm.joined ? (tm.members || t('g.joined')) : t('g.waiting'))}</div></div>
+          ${tm.joined ? `<span class="chip green">${ic('check')}</span>` : ''}</div>`).join('')}</div>
+        <div class="step-actions">${btn('gQuizNext', 'g.startQuiz')}</div>`;
+    } else if (g.phase === 'quiz' && q.idx < 0) {
+      body = `<div class="card g-intro"><span class="chip purple">${esc(t('g.ph.quiz'))}</span><h2>${esc(q.topic)}</h2>
+        <p class="muted">${esc(t('g.quiz.about', { n: q.total, s: q.seconds }))}</p><div class="step-actions">${btn('gQuizNext', 'g.startQuiz')}</div></div>`;
+    } else if (g.phase === 'quiz') {
+      const last = q.idx >= q.total - 1;
+      body = `<div class="card g-q"><div class="row between"><span class="chip purple">${esc(t('g.qn', { n: q.idx + 1, total: q.total }))}</span>${timerHtml(q)}</div>
+        <p class="g-qtext">${esc(q.question.text)}</p>
+        <div class="g-opts">${q.question.options.map((o, i) => `<div class="g-opt ${q.closed ? (i === q.answer ? 'ok' : 'dim') : ''}"><span class="g-let">${LETTERS[i]}</span><span>${esc(o)}</span>${q.closed ? `<b class="g-cnt">${q.counts[i]}</b>` : ''}</div>`).join('')}</div>
+        <div class="g-answered">${g.teams.filter((x) => x.joined).map((tm) => `<span class="chip ${tm.answered ? 'green' : 'gray'}">${tm.answered ? ic('check') : ''}${esc(tm.name)}</span>`).join('')}</div>
+        <div class="step-actions">${!q.closed ? btn('gReveal', 'g.reveal', 'check') : last ? btn('gPhase', 'g.toLesson', 'arrow', 'lesson') : btn('gQuizNext', 'g.nextQ')}</div></div>`;
+    } else if (g.phase === 'lesson') {
+      body = `<div class="card g-intro"><span class="chip">${esc(t('g.ph.lesson'))}</span><h2>${esc(g.lessonTitle)}</h2><p class="muted">${esc(t('g.lesson.t'))}</p>
+        <div class="g-list">${g.teams.filter((x) => x.joined).map((tm) => `<div class="g-row"><span class="g-dot" style="--tc:${esc(tm.color)}"></span><b class="g-name">${esc(tm.name)}</b>
+          <span class="chip ${tm.lesson ? 'green' : 'gray'}">${tm.lesson ? ic('check') + esc(t('g.lesson.done')) + ' · ' + tm.lesson.score : esc(t('g.lesson.wip'))}</span></div>`).join('')}</div>
+        <div class="step-actions"><a class="btn lg ghost" href="#/lesson/${esc(g.lessonId)}">${ic('file')}${esc(t('g.lesson.preview'))}</a>${btn('gPhase', 'g.startQuest', 'lock', 'quest')}</div></div>`;
+    } else if (g.phase === 'quest') {
+      body = `<div class="card g-intro"><span class="chip red">${ic('shield')}${esc(t('g.ph.quest'))}</span><h2>${esc(t('g.quest.title'))}</h2><p class="muted">${esc(t('g.quest.t'))}</p>
+        <div class="g-list">${sortedTeams(g).filter((x) => x.joined).map((tm) => `<div class="g-row g-qrow"><span class="g-dot" style="--tc:${esc(tm.color)}"></span><b class="g-name">${esc(tm.name)}</b>
+          ${lockMap(g, tm.open)}<b class="g-pts">${tm.questScore}</b></div>`).join('')}</div>
+        <div class="step-actions">${btn('gPhase', 'g.toFinish', 'trophy', 'finish')}</div></div>`;
+    } else {
+      body = teamPodium(g) + `<div class="step-actions" style="margin-top:20px">${btn('gNew', 'g.new', 'refresh')}</div>`;
+    }
+    return head + `<div id="g-body">${body}</div><div id="g-board">${boardHtml(g)}</div>`
+      + (g.phase !== 'finish' ? `<div class="g-foot"><button class="btn ghost sm" data-act="gNew">${ic('refresh')}${esc(t('g.new'))}</button></div>` : '');
+  }
+
+  // ----- Экран команды (телефон или ноутбук капитана) -----
+  function curLock() {
+    const g = G.state;
+    if (!g || !g.me) return null;
+    const n = g.me.locks.filter((x) => x.open).length;
+    return n < g.quest.locks.length ? { lock: g.quest.locks[n], st: g.me.locks[n], n } : null;
+  }
+
+  const waitCard = (text) => `<div class="card g-wait"><div class="wait-dots" aria-hidden="true"><i></i><i></i><i></i></div><p>${esc(text)}</p></div>`;
+
+  function teamGameHtml(g) {
+    const m = g.me;
+    const tm = g.teams.find((x) => x.id === m.id);
+    const head = `<div class="g-head"><div class="row">${avatar({ name: m.name, color: m.color }, 'lg')}<div><h1 class="h1">${esc(m.name)}</h1><div class="muted">${esc(m.members || t('g.team'))}</div></div></div>
+      <div class="g-code"><small>${esc(t('g.score'))}</small><b>${tm.score}</b></div></div>`;
+    const q = g.quiz;
+    let body;
+    if (g.phase === 'lobby') body = waitCard(t('g.wait.lobby'));
+    else if (g.phase === 'quiz' && q.idx < 0) body = waitCard(t('g.wait.quiz'));
+    else if (g.phase === 'quiz') {
+      const mine = m.quiz;
+      let status = '';
+      if (!q.closed && mine) status = `<div class="note-box hl">${esc(t('g.answered'))}</div>`;
+      if (q.closed) status = `<div class="feedback ${mine && mine.points > 0 ? 'ok' : 'bad'}">${esc(mine && mine.points > 0 ? t('g.right', { p: mine.points }) : mine ? t('g.wrong') : t('g.late'))}</div>`;
+      body = `<div class="card g-q"><div class="row between"><span class="chip purple">${esc(t('g.qn', { n: q.idx + 1, total: q.total }))}</span>${timerHtml(q)}</div>
+        <p class="g-qtext">${esc(q.question.text)}</p>
+        <div class="g-opts">${q.question.options.map((o, i) => `<button class="g-opt pick ${mine && mine.option === i ? 'picked' : ''} ${q.closed ? (i === q.answer ? 'ok' : 'dim') : ''}" data-act="gAnswer" data-v="${i}" ${mine || q.closed ? 'disabled' : ''}>
+          <span class="g-let">${LETTERS[i]}</span><span>${esc(o)}</span></button>`).join('')}</div>${status}</div>`;
+    } else if (g.phase === 'lesson') {
+      body = `<div class="card g-intro"><span class="chip">${esc(t('g.ph.lesson'))}</span><h2>${esc(g.lessonTitle)}</h2>
+        ${tm.lesson ? `<div class="feedback ok">${esc(t('g.lesson.got', { n: tm.lesson.score }))}</div>
+          <div class="step-actions"><button class="btn ghost" data-act="openLesson" data-v="${esc(g.lessonId)}">${esc(t('repeat'))}</button></div>`
+        : `<p class="muted">${esc(t('g.lesson.s'))}</p><div class="step-actions"><button class="btn lg" data-act="openLesson" data-v="${esc(g.lessonId)}">${ic('sparkle')}${esc(t('g.lesson.open'))}${ic('arrow')}</button></div>`}</div>`;
+    } else if (g.phase === 'quest') body = questHtml(g);
+    else {
+      const place = sortedTeams(g).findIndex((x) => x.id === m.id) + 1;
+      body = `<div class="note-box hl">${esc(t('g.place', { n: place }))}</div>` + teamPodium(g);
+    }
+    return head + `<div id="g-body">${body}</div><div id="g-board">${boardHtml(g)}</div>`;
+  }
+
+  function questHtml(g) {
+    const n = g.me.locks.filter((x) => x.open).length;
+    const map = lockMap(g, n, true);
+    const cur = curLock();
+    if (!cur) {
+      const fixes = g.me.locks[g.me.locks.length - 1].fixes || [];
+      const last = g.quest.locks[g.quest.locks.length - 1];
+      return map + `<div class="card result"><div class="chip green">${ic('unlock')}${esc(t('g.safe'))}</div>
+        <p style="margin-top:14px">${esc(t('g.safe.t'))}</p><div class="big">${g.teams.find((x) => x.id === g.me.id).questScore}</div></div>
+        ${fixes.length ? `<div class="section-head"><h2>${esc(t('g.fixes'))}</h2></div><div class="card">${fixes.map((f) => `<div class="g-fix"><s>${esc(last.sentences[f.i])}</s><span>${ic('check')}${esc(f.fix)}</span></div>`).join('')}</div>` : ''}`;
+    }
+    const { lock, st } = cur;
+    const qs = g.quest;
+    const now = Math.max(qs.minPoints, lock.points - st.hints.length * qs.hintCost - st.tries * qs.tryCost);
+    let task;
+    if (lock.type === 'sort') {
+      const sel = G.sel[lock.id] || [];
+      task = `<div class="g-sorts">${lock.items.map((it, i) => `<div class="g-sort"><span>${esc(it)}</span>
+        <div class="seg" role="group">${lock.categories.map((c, k) => `<button class="${sel[i] === k ? 'active' : ''}" data-act="gSort" data-v="${i}:${k}">${esc(c)}</button>`).join('')}</div></div>`).join('')}</div>`;
+    } else if (lock.type === 'number') {
+      task = `<div class="answer-row"><input id="g-num" type="text" inputmode="numeric" autocomplete="off" aria-label="${esc(t('g.num.ph'))}" placeholder="${esc(t('g.num.ph'))}" value="${esc(G.num)}"><span class="g-unit">${esc(lock.unit || '')}</span></div>`;
+    } else {
+      const picked = G.picked[lock.id] || [];
+      task = `<div class="g-sents">${lock.sentences.map((s, i) => `<button class="g-sent ${picked.includes(i) ? 'picked' : ''}" data-act="gPick" data-v="${i}" aria-pressed="${picked.includes(i)}"><span class="g-let">${i + 1}</span><span>${esc(s)}</span></button>`).join('')}</div>`;
+    }
+    const fb = G.fb && G.fb.lock === lock.id ? `<div class="feedback bad">${esc(G.fb.text)}</div>` : '';
+    const hints = st.hints.map((h) => `<div class="g-hint"><span class="cop-mini">${ic('sparkle')}</span><span>${esc(h)}</span></div>`).join('');
+    return map + `<div class="card step-card g-lock"><div class="row between"><span class="chip red">${ic('lock')}${esc(t('g.lock', { n: cur.n + 1 }))}</span><span class="chip gray">${esc(t('g.lock.pts', { p: lock.points, now }))}</span></div>
+      <h2 class="g-lock-title">${esc(lock.title)}</h2><p class="text">${esc(lock.task)}</p>
+      ${task}${fb}${hints}
+      <div class="step-actions">
+        ${st.hintsLeft > 0 ? `<button class="btn ghost" data-act="gHint">${ic('sparkle')}${esc(t('g.hint', { n: qs.hintCost }))}</button>` : ''}
+        <button class="btn lg" data-act="gCheck">${ic('unlock')}${esc(t('g.check'))}</button></div></div>`;
+  }
+
+  // Правая панель на экране игры: копилот команды
+  function gamePanel(head) {
+    const g = G.state;
+    let msgs = [];
+    let quick = '';
+    if (S.role === 'teacher') msgs = [t('g.cop.t1'), t('g.cop.t2')];
+    else if (!g) msgs = [t('g.cop.wait')];
+    else if (g.phase === 'quiz') msgs = [t('g.cop.quiz')];
+    else if (g.phase === 'lesson') {
+      msgs = [t('g.cop.lesson')];
+      quick = `<button data-act="openLesson" data-v="${esc(g.lessonId)}">${ic('sparkle')}${esc(t('g.lesson.open'))}</button>`;
+    } else if (g.phase === 'quest') {
+      const cur = curLock();
+      if (!cur) msgs = [t('g.cop.done')];
+      else {
+        msgs = [t('g.cop.quest', { n: g.quest.hintCost }), ...cur.st.hints];
+        if (cur.st.hintsLeft > 0) quick = `<button data-act="gHint">${ic('bulb')}${esc(t('g.hint', { n: g.quest.hintCost }))}</button>`;
+      }
+    } else if (g.phase === 'finish') msgs = [t('g.cop.done')];
+    else msgs = [t('g.cop.wait')];
+    return `<div class="copilot">${head}<div class="chat">${msgs.map((m) => `<div class="msg bot">${esc(m)}</div>`).join('')}</div>
+      ${quick ? `<div class="quick">${quick}</div>` : ''}<div class="cop-info">${esc(t('g.cop.info'))}</div></div>`;
+  }
+
+  // Действие преподавателя: отправить запрос и сразу показать новое состояние
+  async function teacherAct(url, body, method) {
+    try {
+      const r = await api(url, body || {}, method);
+      G.state = r.game;
+      renderGame(true);
+    } catch (e) { toast(e.message); }
+  }
+  const teamBody = (extra) => ({ code: S.team.code, teamId: S.team.teamId, ...extra });
+
   // ---------- Настройки ----------
   function openSettings() {
     const students = S.users.filter((u) => u.role === 'student');
     $('#modal-root').innerHTML = `<div class="modal-bg" data-act="closeModal"><div class="modal">
       <div class="row between"><h2>${esc(t('nav.settings'))}</h2><button class="icon-btn" data-act="closeModal">${ic('close')}</button></div>
       <div class="set-row"><div>${esc(t('set.lang'))}</div><div class="lang-switch"><button class="${S.lang === 'ru' ? 'active' : ''}" data-act="lang" data-v="ru">RU</button><button class="${S.lang === 'kk' ? 'active' : ''}" data-act="lang" data-v="kk">KZ</button></div></div>
-      ${S.role === 'student' ? `<div class="set-row"><div>${esc(t('set.student'))}<small>${esc(t('set.student.sub'))}</small></div><select class="select" data-change="setStudent">${students.map((u) => `<option value="${u.id}" ${u.id === S.studentId ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>` : ''}
-      <div class="set-row"><div>${esc(t('set.mock'))}<small>${esc(S.config.hasKey ? t('set.mock.sub') : t('set.mock.nokey'))}</small></div><button class="toggle ${S.config.mock ? 'on' : ''}" data-act="toggleMock" aria-label="mock"></button></div>
-      <div class="set-row"><div>${esc(t('set.reset'))}<small>${esc(t('set.reset.sub'))}</small></div><button class="btn ghost sm" data-act="resetDemo">${ic('refresh')}${esc(t('set.reset.btn'))}</button></div>
+      ${S.role === 'student' && !S.team ? `<div class="set-row"><div>${esc(t('set.student'))}<small>${esc(t('set.student.sub'))}</small></div><select class="select" data-change="setStudent">${students.map((u) => `<option value="${u.id}" ${u.id === S.studentId ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>` : ''}
+      ${S.role === 'teacher' ? `<div class="set-row"><div>${esc(t('set.mock'))}<small>${esc(S.config.hasKey ? t('set.mock.sub') : t('set.mock.nokey'))}</small></div><button class="toggle ${S.config.mock ? 'on' : ''}" data-act="toggleMock" aria-label="mock"></button></div>` : ''}
+      ${S.role === 'teacher' ? `<div class="set-row"><div>${esc(t('set.reset'))}<small>${esc(t('set.reset.sub'))}</small></div><button class="btn ghost sm" data-act="resetDemo">${ic('refresh')}${esc(t('set.reset.btn'))}</button></div>` : ''}
+      <div class="set-row"><div>${esc(t('set.logout'))}<small>${esc(t('set.logout.sub'))}</small></div><button class="btn ghost sm" data-act="logout">${ic('logout')}${esc(t('set.logout'))}</button></div>
     </div></div>`;
   }
   const closeModal = () => { $('#modal-root').innerHTML = ''; };
@@ -771,9 +1186,9 @@
   // ---------- События ----------
   const handlers = {
     nav: (v) => { closeModal(); if (v === 'lessons') S.courseFilter = null; go(v); },
-    role: (v) => { S.role = v; store.set('role', v); if (v === 'teacher') C = null; go('home'); },
     lang: async (v) => {
       await loadDict(v);
+      if (A) { renderAuth(); return; }
       const open = $('#modal-root').innerHTML;
       if (C) C.form.language = v;
       if (S.page === 'lesson' && P) { renderSidebar(); renderTop(); renderPlayer(); renderPanel(); } else route();
@@ -785,7 +1200,7 @@
     closeModal,
     bell: (v, el) => { fx('bell', v, el); toast(t('notif.none')); },
     continue: async () => {
-      const list = await api('/api/lessons?studentId=' + S.studentId);
+      const list = await api('/api/lessons?studentId=' + learnerId());
       const next = list.find((l) => !l.done && l.status === 'published');
       if (next) go('lesson', next.id); else go('lessons');
     },
@@ -806,6 +1221,121 @@
       openSettings(); renderPanel();
     },
     resetDemo,
+    // Вход и выход
+    authMode: (v) => { A.mode = v; renderAuth(); },
+    authCode: async () => {
+      const code = (($('#a-code') || {}).value || '').replace(/\D/g, '');
+      if (code.length !== 4) { toast(t('auth.code.bad')); return; }
+      try {
+        const r = await api('/api/game?code=' + code);
+        if (!r.game) throw new Error('none');
+        A.code = code; A.game = r.game; A.mode = 'team'; A.teamId = null;
+        renderAuth();
+      } catch (e) { toast(t('auth.code.none')); }
+    },
+    authTeam: (v) => { A.teamId = v; renderAuth(); },
+    authJoin: async () => {
+      if (!A || !A.teamId) return;
+      try {
+        const r = await api('/api/game/join', { code: A.code, teamId: A.teamId, members: A.members.trim() });
+        const m = r.game.me;
+        saveSession({ role: 'team', code: A.code, teamId: m.id, name: m.name, color: m.color });
+        enterApp();
+      } catch (e) { toast(e.message); }
+    },
+    authDemo: () => {
+      store.set('studentId', A.studentId);
+      saveSession({ role: 'student', studentId: A.studentId });
+      enterApp();
+    },
+    authTeacher: async () => {
+      const inp = $('#a-pin');
+      const pin = inp ? inp.value.trim() : '';
+      if (!pin) return;
+      try {
+        const r = await api('/api/teacher/login', { pin });
+        saveSession({ role: 'teacher', token: r.token });
+        enterApp();
+      } catch (e) { toast(t('auth.pin.bad')); if (inp) { inp.value = ''; inp.focus(); } }
+    },
+    logout: () => {
+      const wasTeacher = S.role === 'teacher';
+      store.set('session', '');
+      applySession(null);
+      history.replaceState(null, '', wasTeacher ? '/teacher' : '/');
+      showAuth();
+    },
+
+    // Открытый урок: преподаватель
+    gCount: (v) => { G.count = Number(v); renderGame(true); },
+    gCreate: () => { G.sel = {}; G.picked = {}; G.num = ''; G.fb = null; return teacherAct('/api/game', { teams: G.count }); },
+    gNew: () => { if (confirm(t('g.new.confirm'))) teacherAct('/api/game', {}, 'DELETE'); },
+    gPhase: (v) => teacherAct('/api/game/phase', { phase: v }),
+    gQuizNext: () => teacherAct('/api/game/quiz/next'),
+    gReveal: () => teacherAct('/api/game/quiz/reveal'),
+
+    // Открытый урок: команда
+    gAnswer: async (v) => {
+      G.busy = true;
+      try { G.state = (await api('/api/game/quiz/answer', teamBody({ option: Number(v) }))).game; } catch (e) { toast(e.message); }
+      G.busy = false;
+      renderGame(true);
+    },
+    // Выбор группы для карточки: меняем только кнопки в строке, без перерисовки экрана
+    gSort: (v, el) => {
+      const cur = curLock();
+      if (!cur) return;
+      const [i, k] = v.split(':').map(Number);
+      (G.sel[cur.lock.id] = G.sel[cur.lock.id] || [])[i] = k;
+      el.parentNode.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === el));
+    },
+    gPick: (v, el) => {
+      const cur = curLock();
+      if (!cur) return;
+      const list = G.picked[cur.lock.id] = G.picked[cur.lock.id] || [];
+      const i = Number(v);
+      const at = list.indexOf(i);
+      if (at >= 0) list.splice(at, 1); else list.push(i);
+      el.classList.toggle('picked', at < 0);
+      el.setAttribute('aria-pressed', String(at < 0));
+    },
+    gCheck: async () => {
+      const cur = curLock();
+      if (!cur || G.busy) return;
+      const { lock } = cur;
+      let answer;
+      if (lock.type === 'sort') {
+        answer = lock.items.map((_, i) => (G.sel[lock.id] || [])[i]);
+        if (answer.some((x) => x === undefined)) { toast(t('g.sort.all')); return; }
+      } else if (lock.type === 'number') {
+        answer = (($('#g-num') || {}).value || '').trim();
+        if (!answer) { toast(t('g.num.empty')); return; }
+      } else {
+        answer = G.picked[lock.id] || [];
+        if (!answer.length) { toast(t('g.pick.some')); return; }
+      }
+      G.busy = true;
+      let ok = false;
+      try {
+        const r = await api('/api/game/quest/check', teamBody({ lock: lock.id, answer }));
+        G.state = r.game;
+        ok = r.correct;
+        G.fb = ok ? null : { lock: lock.id, text: r.total ? t('g.partial', { n: r.right, total: r.total }) : t('g.notyet') };
+        if (ok) { G.num = ''; toast(t('g.opened', { p: r.points })); }
+      } catch (e) { toast(e.message); }
+      G.busy = false;
+      renderGame(true);
+      if (!ok) fx('feedback', false);
+    },
+    gHint: async () => {
+      const cur = curLock();
+      if (!cur || G.busy) return;
+      if (!confirm(t('g.hint.confirm', { n: G.state.quest.hintCost }))) return;
+      G.busy = true;
+      try { G.state = (await api('/api/game/quest/hint', teamBody({ lock: cur.lock.id }))).game; } catch (e) { toast(e.message); }
+      G.busy = false;
+      renderGame(true);
+    },
   };
 
   document.addEventListener('click', (e) => {
@@ -822,6 +1352,8 @@
     const el = e.target;
     if (el.dataset.form && C) C.form[el.dataset.form] = el.value;
     if (el.dataset.d) editDraft(el);
+    if (el.dataset.auth && A) A[el.dataset.auth] = el.value;
+    if (el.id === 'g-num') G.num = el.value;
   });
 
   document.addEventListener('change', async (e) => {
@@ -834,11 +1366,15 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       if (e.target.id === 'ans') doCheck();
+      else if (e.target.id === 'a-code') handlers.authCode();
+      else if (e.target.id === 'a-pin') handlers.authTeacher();
+      else if (e.target.id === 'a-members') handlers.authJoin();
+      else if (e.target.id === 'g-num') handlers.gCheck();
       else if (e.target.id === 'chat-in') handlers.send();
       else if (e.target.id === 'q') { S.query = e.target.value; go('lessons'); }
     }
     // Скрытая горячая клавиша сброса демо-данных: Ctrl + Alt + R
-    if (e.ctrlKey && e.altKey && e.code === 'KeyR') { e.preventDefault(); resetDemo(); }
+    if (e.ctrlKey && e.altKey && e.code === 'KeyR' && S.role === 'teacher') { e.preventDefault(); resetDemo(); }
   });
 
   window.addEventListener('hashchange', route);
@@ -850,6 +1386,11 @@
       [S.users, S.config] = await Promise.all([api('/api/users'), api('/api/config')]);
       await loadCourses();
       if (!S.users.find((u) => u.id === S.studentId)) S.studentId = 's1';
+      // Проверяем сохранённый вход: токен преподавателя и код игры могли устареть
+      const sess = await checkSession(readSession());
+      if (!sess || (isTeacherPath() && sess.role !== 'teacher')) { applySession(null); showAuth(); return; }
+      applySession(sess);
+      if (isTeacherPath()) history.replaceState(null, '', '/' + (location.hash || '#/game'));
       route();
     } catch (e) {
       $('#main').innerHTML = `<div class="empty">${esc(e.message)}</div>`;

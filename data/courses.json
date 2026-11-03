@@ -22,5 +22,13 @@
     "icon": "lang",
     "color": "green",
     "type": "language"
+  },
+  {
+    "id": "c4",
+    "title": "Охрана труда",
+    "subtitle": "Безопасность и условия труда",
+    "icon": "shield",
+    "color": "red",
+    "type": "safety"
   }
 ]

@@ -4,16 +4,22 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const db = require('./server/db');
 const ai = require('./server/ai');
 const { seed } = require('./server/seed');
 const { ratingFor, availableMonths, monthKey, LESSONS_TARGET } = require('./server/rating');
 const { buildNotesDoc, buildLessonReport, buildGradesWorkbook } = require('./server/reports');
+const game = require('./server/game');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+// Отдельная страница входа преподавателя (тот же сайт, экран выбирается в app.js)
+app.get('/teacher', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Открытый урок: команды, квиз, квест
+app.use('/api', game.router);
 
 // Если данных ещё нет, создаём тестовые
 if (!fs.existsSync(path.join(db.DATA_DIR, 'users.json'))) seed();
@@ -82,13 +88,13 @@ app.post('/api/lessons', (req, res) => {
 
 // ---------- Прохождение урока ----------
 app.post('/api/chat', route(async (req, res) => {
-  const { lessonId, stepId, studentId, message, action, history, language } = req.body;
+  const { lessonId, stepId, studentId, who, message, action, history, language } = req.body;
   const lesson = db.read('lessons').find((l) => l.id === lessonId);
   if (!lesson) return res.status(404).json({ error: 'Урок не найден' });
   const { data, mode } = await ai.chatWithStudent({ lesson, stepId, history: history || [], message: message || '', action, language: language || lesson.language });
   if (data.gap) {
     const gaps = db.read('gaps');
-    gaps.push({ id: db.newId('g'), lessonId, stepId, studentId, type: data.gap.type, note: data.gap.note, date: new Date().toISOString() });
+    gaps.push({ id: db.newId('g'), lessonId, stepId, studentId, who, type: data.gap.type, note: data.gap.note, date: new Date().toISOString() });
     db.write('gaps', gaps);
   }
   const activity = db.read('activity');
@@ -110,13 +116,7 @@ app.post('/api/attempts', (req, res) => {
   const { lessonId, studentId, answers } = req.body;
   const lesson = db.read('lessons').find((l) => l.id === lessonId);
   if (!lesson) return res.status(404).json({ error: 'Урок не найден' });
-  const questions = lesson.steps.filter((s) => s.type === 'question');
-  // За каждую лишнюю попытку снимаем 10 баллов
-  const scored = questions.map((q) => {
-    const a = (answers || []).find((x) => x.stepId === q.id);
-    return a ? { stepId: q.id, score: a.score, tries: a.tries || 1, final: Math.max(0, a.score - 10 * ((a.tries || 1) - 1)) } : { stepId: q.id, score: 0, tries: 0, final: 0 };
-  });
-  const score = questions.length ? Math.round(scored.reduce((s, x) => s + x.final, 0) / questions.length) : 100;
+  const { score, scored } = game.scoreLesson(lesson, answers);
   const attempt = {
     id: db.newId('a'), lessonId, studentId,
     answers: scored.map(({ stepId, score: sc, tries }) => ({ stepId, score: sc, tries })),
@@ -224,14 +224,27 @@ app.get('/api/grades.xlsx', route(async (req, res) => {
 }));
 
 // ---------- Настройки демо ----------
-app.get('/api/config', (req, res) => res.json({ mock: ai.isMock(), hasKey: ai.hasKey() }));
-app.post('/api/config', (req, res) => { ai.setMock(!!req.body.mock); res.json({ mock: ai.isMock() }); });
-app.post('/api/reset', (req, res) => { seed(); res.json({ ok: true }); });
+// Адреса сайта в локальной сети: по ним студенты заходят с телефонов
+function lanUrls() {
+  const port = process.env.PORT || 3000;
+  return Object.values(os.networkInterfaces()).flat()
+    .filter((n) => n && n.family === 'IPv4' && !n.internal)
+    .map((n) => `http://${n.address}:${port}`);
+}
+
+app.get('/api/config', (req, res) => res.json({ mock: ai.isMock(), hasKey: ai.hasKey(), lan: process.env.VERCEL ? [] : lanUrls() }));
+// Переключать режим ИИ и сбрасывать данные может только преподаватель
+app.post('/api/config', game.onlyTeacher, (req, res) => { ai.setMock(!!req.body.mock); res.json({ mock: ai.isMock() }); });
+app.post('/api/reset', game.onlyTeacher, route(async (req, res) => { seed(); await game.clear(); res.json({ ok: true }); }));
 
 // Локально запускаем сервер сами, на Vercel он вызывает приложение как функцию
 if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`Платформа запущена: http://localhost:${PORT} (MOCK_AI=${ai.isMock()})`));
+  app.listen(PORT, () => {
+    console.log(`Платформа запущена: http://localhost:${PORT} (MOCK_AI=${ai.isMock()})`);
+    lanUrls().forEach((u) => console.log('Для телефонов в той же Wi-Fi сети: ' + u));
+    if (!process.env.TEACHER_PIN) console.log('PIN преподавателя не задан в .env, используется 1234');
+  });
 }
 
 module.exports = app;
