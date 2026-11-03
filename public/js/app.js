@@ -977,7 +977,7 @@
         <b class="g-pts">${tm.score}</b></div>`).join('')}</div>`;
   }
 
-  // Цепочка из 5 замков. n - сколько открыто
+  // Цепочка замков квеста. n - сколько открыто
   function lockMap(g, n, withTitles) {
     return `<div class="g-locks ${withTitles ? 'big' : ''}">${g.quest.locks.map((l, i) => `
       <div class="lock-node ${i < n ? 'open' : i === n ? 'cur' : ''} ${i === n - 1 ? 'just' : ''}" title="${esc(l.title)}">
@@ -1038,7 +1038,7 @@
           <span class="chip ${tm.lesson ? 'green' : 'gray'}">${tm.lesson ? ic('check') + esc(t('g.lesson.done')) + ' · ' + tm.lesson.score : esc(t('g.lesson.wip'))}</span></div>`).join('')}</div>
         <div class="step-actions"><a class="btn lg ghost" href="#/lesson/${esc(g.lessonId)}">${ic('file')}${esc(t('g.lesson.preview'))}</a>${btn('gPhase', 'g.startQuest', 'lock', 'quest')}</div></div>`;
     } else if (g.phase === 'quest') {
-      body = `<div class="card g-intro"><span class="chip red">${ic('shield')}${esc(t('g.ph.quest'))}</span><h2>${esc(t('g.quest.title'))}</h2><p class="muted">${esc(t('g.quest.t'))}</p>
+      body = `<div class="card g-intro"><span class="chip red">${ic('shield')}${esc(t('g.ph.quest'))}</span><h2>${esc(t('g.quest.title'))}</h2><p class="muted">${esc(t('g.quest.t', { n: g.quest.locks.length }))}</p>
         <div class="g-list">${sortedTeams(g).filter((x) => x.joined).map((tm) => `<div class="g-row g-qrow"><span class="g-dot" style="--tc:${esc(tm.color)}"></span><b class="g-name">${esc(tm.name)}</b>
           ${lockMap(g, tm.open)}<b class="g-pts">${tm.questScore}</b></div>`).join('')}</div>
         <div class="step-actions">${btn('gPhase', 'g.toFinish', 'trophy', 'finish')}</div></div>`;

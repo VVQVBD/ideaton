@@ -371,7 +371,7 @@ button, [data-act], .filter, .nav-item, .lesson-card, .course-card, .stat-card, 
   .g-row .progress { display: none; }
   .g-list .g-qrow { grid-template-columns: auto minmax(0, 1fr) auto; }
   .g-list .g-qrow .g-locks { grid-column: 1 / -1; }
-  .lock-node small { font-size: 10.5px; }
+  .g-locks.big small { display: none; } /* на телефоне 8 подписей не помещаются, название есть в карточке замка */
   .g-locks.big .lock-ic { width: 44px; height: 44px; border-radius: 14px; }
   .auth-card { padding: 22px 18px; }
 }
