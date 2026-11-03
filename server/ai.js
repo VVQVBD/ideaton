@@ -11,10 +11,15 @@ const provider = () => (process.env.AI_PROVIDER || 'gemini').toLowerCase();
 const hasKey = () => !!(provider() === 'openai' ? process.env.OPENAI_API_KEY : process.env.GEMINI_API_KEY);
 
 // ---------- Gemini (обычный HTTP-запрос, отдельные пакеты не нужны) ----------
-async function geminiJSON(messages, backup) {
+// Модели по очереди: основная, затем запасные из GEMINI_FALLBACK_MODEL (через запятую)
+function geminiModels() {
+  const main = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const extra = String(process.env.GEMINI_FALLBACK_MODEL || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return [main, ...extra.filter((m) => m !== main)];
+}
+
+async function geminiJSON(messages, model, timeout) {
   if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY не задан в .env');
-  // backup - последняя попытка: если задана запасная модель (GEMINI_FALLBACK_MODEL), пробуем её
-  const model = (backup && process.env.GEMINI_FALLBACK_MODEL) || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
   // Gemini: роли user/model, диалог начинается с user, одинаковые роли подряд склеиваем
   const contents = [];
@@ -31,7 +36,7 @@ async function geminiJSON(messages, backup) {
   };
   if (system) body.systemInstruction = { parts: [{ text: system }] };
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 75000);
+  const timer = setTimeout(() => ctrl.abort(), timeout);
   try {
     const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
       method: 'POST',
@@ -40,10 +45,13 @@ async function geminiJSON(messages, backup) {
       signal: ctrl.signal,
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error('Gemini ' + r.status + ': ' + ((j.error && j.error.message) || 'ошибка'));
+    if (!r.ok) throw new Error('Gemini ' + model + ' ' + r.status + ': ' + ((j.error && j.error.message) || 'ошибка'));
     const text = (((j.candidates || [])[0] || {}).content || {}).parts;
     if (!text || !text.length) throw new Error('Gemini вернул пустой ответ');
     return JSON.parse(text.map((p) => p.text || '').join('').replace(/^```json\s*|```\s*$/g, ''));
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Gemini ' + model + ': нет ответа за ' + timeout / 1000 + ' с');
+    throw e;
   } finally { clearTimeout(timer); }
 }
 
@@ -58,18 +66,21 @@ async function openaiJSON(messages) {
   return JSON.parse(res.choices[0].message.content);
 }
 
-// Запрос к ИИ, который обязан вернуть JSON. При ошибке пробуем ещё раз.
-// Если модель перегружена (503, 500), ждём перед повтором: такие всплески обычно проходят за секунды
-async function askJSON(messages, attempts = 3) {
+// Запрос к ИИ, который обязан вернуть JSON. timeout - сколько ждать одну модель (мс).
+// Gemini: идём по цепочке моделей. Если модель перегружена (503), кончилась квота (429),
+// её нет (404) или она молчит, сразу берём следующую. Ошибку ключа (400, 401, 403) повторять бесполезно
+async function askJSON(messages, timeout = 20000) {
+  if (provider() === 'openai') {
+    try { return await openaiJSON(messages); } catch (e) { return openaiJSON(messages); } // один повтор
+  }
   let lastErr;
-  for (let i = 0; i < attempts; i++) {
+  for (const model of geminiModels()) {
     try {
-      const last = i === attempts - 1;
-      return await (provider() === 'openai' ? openaiJSON(messages) : geminiJSON(messages, last));
+      return await geminiJSON(messages, model, timeout);
     } catch (e) {
       lastErr = e;
-      if (/\b(400|401|403|404|429)\b/.test(e.message) || /не задан|aborted/.test(e.message)) break; // повтор не поможет
-      if (/\b(500|503)\b/.test(e.message) && i < attempts - 1) await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+      console.warn('[ai] ' + e.message.slice(0, 120));
+      if (/\b(400|401|403)\b/.test(e.message) || /не задан/.test(e.message)) break;
     }
   }
   throw lastErr;
@@ -124,7 +135,7 @@ function generateLesson({ topic, goals, level, language, size }) {
 Формат JSON: {"title":"...","goals":["..."],"notes":{"sections":[{"heading":"название раздела","points":["короткий тезис"]}],"terms":[{"term":"термин","def":"короткое определение"}],"example":"один понятный пример"},"steps":[{"id":"s1","type":"theory","text":"..."},{"id":"s2","type":"question","text":"вопрос","correctAnswer":"короткий правильный ответ","hint":"подсказка, не раскрывающая ответ"}]}
 Конспект - это письменный материал, из которого студент берёт знания до вопросов. ${size === 'detailed' ? 'Подробный: 5-6 разделов, по 3-5 тезисов, 4-6 терминов, пример с пояснением.' : 'Короткий: 3-4 раздела, всего до 10 тезисов, 3-4 термина, один короткий пример.'}
 Требования: 3-4 блока теории и 3-4 вопроса, они чередуются (теория, вопрос, теория, вопрос...). Теория 2-4 предложения с примером. Вопросы с коротким однозначным ответом.`;
-    return normalizeLesson(await askJSON([{ role: 'system', content: system }, { role: 'user', content: user }]));
+    return normalizeLesson(await askJSON([{ role: 'system', content: system }, { role: 'user', content: user }], 75000)); // урок длинный, ждём дольше
   }, () => mock.mockLesson(topic, goals, size));
 }
 
