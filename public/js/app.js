@@ -4,7 +4,8 @@
 
   // ---------- Утилиты ----------
   const $ = (s, el = document) => el.querySelector(s);
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // Чистые функции интерфейса лежат в utils.js (их проверяют тесты)
+  const { esc, format, firstName, initials, longestWord, accentLast, navLabel } = window.U;
   const store = {
     get(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ничего */ } },
@@ -23,10 +24,8 @@
   let C = null; // состояние создания урока
 
   function t(key, vars) {
-    let s = S.dict[key];
-    if (s === undefined) s = key;
-    if (vars) Object.keys(vars).forEach((k) => { s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]); });
-    return s;
+    const s = S.dict[key];
+    return format(s === undefined ? key : s, vars);
   }
 
   async function api(url, body, method) {
@@ -103,41 +102,40 @@
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
     unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/>',
     logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+    pen: '<path d="M4 20l4-1L19 8l-3-3L5 16z"/><path d="M14 7l3 3"/>',
+    chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
   };
-  const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
-
-  const ring = (p, big = false) => `<svg class="ring ${big ? 'big' : ''}" viewBox="0 0 36 36"><defs><linearGradient id="rg${big ? 'b' : 's'}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><circle class="trk" cx="18" cy="18" r="15.9" fill="none" stroke-width="3.4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="url(#rg${big ? 'b' : 's'})" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${p} ${100 - p}" transform="rotate(-90 18 18)"/></svg>`;
+  const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
 
   // ---------- Помощники по данным ----------
   const me = () => (S.team ? { id: S.team.teamId, name: S.team.name, color: S.team.color }
     : S.role === 'teacher' ? S.users.find((u) => u.role === 'teacher') : S.users.find((u) => u.id === S.studentId)) || { name: '?', color: '#999' };
   // Кто проходит уроки: команда (в игре) или студент (демо-вход)
   const learnerId = () => (S.team ? S.team.teamId : S.studentId);
-  const firstName = (n) => String(n || '').split(' ')[0];
-  const initials = (n) => String(n || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-  const avatar = (u, cls = '') => `<span class="avatar ${cls}" style="background:${esc(u.color || '#2563eb')}">${esc(initials(u.name))}</span>`;
+  const avatar = (u, cls = '') => `<span class="avatar ${cls}">${esc(initials(u.name))}</span>`;
+  // Сегодняшняя дата для подписи над заголовком и название месяца рейтинга на языке интерфейса
+  const todayLabel = () => window.U.todayLabel(S.lang, new Date());
   const courseOf = (id) => S.courses.find((c) => c.id === id) || { title: '', color: 'blue', icon: 'code' };
-  const courseChipClass = (c) => ({ blue: '', red: 'red', green: 'green' }[c.color] || '');
-  const monthLabel = (m) => {
-    const [y, mo] = m.split('-').map(Number);
-    const s = new Date(y, mo - 1, 1).toLocaleDateString(S.lang === 'kk' ? 'kk-KZ' : 'ru-RU', { month: 'long', year: 'numeric' });
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  };
+  // Чип курса нейтральный: цвет в интерфейсе оставлен только для смысла (верно, акцент), а не для категорий
+  const courseChipClass = () => '';
+  const monthLabel = (m) => window.U.monthLabel(m, S.lang);
   // Скелетон вместо пустого экрана (появляется, только если загрузка не мгновенная)
   const loading = () => `<div class="skel-wrap" role="status" aria-label="${esc(t('loading'))}">
     <div class="skel" style="height:44px;width:46%;margin-top:10px"></div><div class="skel" style="height:22px;width:30%;margin-top:12px"></div>
-    <div class="skel" style="height:210px;margin-top:20px;border-radius:22px"></div>
+    <div class="skel" style="height:210px;margin-top:20px"></div>
     <div class="grid c3" style="margin-top:18px"><div class="skel" style="height:92px"></div><div class="skel" style="height:92px"></div><div class="skel" style="height:92px"></div></div>
     <div class="grid c2" style="margin-top:26px"><div class="skel" style="height:170px"></div><div class="skel" style="height:170px"></div></div></div>`;
 
-  // Картинка на главном экране: книга, звёздочки и парящие плашки
-  const STAR = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg>';
-  function heroArt(kind) {
-    const icons = kind === 't' ? ['file', 'table'] : ['sparkle', 'check'];
-    return `<div class="art" aria-hidden="true"><span class="art-logo art-orb">${ic('sparkle')}</span>
-      <span class="spark s1">${STAR}</span><span class="spark s2">${STAR}</span><span class="spark s3">${STAR}</span>
-      <span class="float-chip f1">${ic(icons[0])}${esc(t('hero.' + kind + '.c1'))}</span>
-      <span class="float-chip f2">${ic(icons[1])}${esc(t('hero.' + kind + '.c2'))}</span></div>`;
+  // Приветствие: имя на цветной маркер-подложке
+  const helloHtml = (key, name) => esc(t(key, { name: '\u0001' })).replace('\u0001', `<mark>${esc(firstName(name))}</mark>`);
+  // Звезда-разделитель и крупная геометрическая звезда для блоков
+  const STAR_PATH = 'M12 0l3.2 8.8L24 12l-8.8 3.2L12 24l-3.2-8.8L0 12l8.8-3.2z';
+  const STAR_SHAPE = `<svg class="shape-star" data-parallax viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>`;
+  // Бегущая строка: фразы из словаря через "|", текст повторяется дважды для бесшовной прокрутки
+  function marquee(key = 'marquee') {
+    const star = `<svg class="mq-star" viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>`;
+    const row = t(key).split('|').map((x) => `<span>${esc(x)}</span>${star}`).join('');
+    return `<div class="marquee" aria-hidden="true"><div class="mq-track">${row}${row}${row}${row}</div></div>`;
   }
   const CROWN = '<svg viewBox="0 0 46 34" fill="currentColor"><path d="M3 10l10 9 10-15 10 15 10-9-4 22H7z"/><circle cx="3" cy="9" r="3"/><circle cx="23" cy="4" r="3"/><circle cx="43" cy="9" r="3"/></svg>';
 
@@ -189,14 +187,14 @@
     $('#sidebar').innerHTML = `
       <div class="logo"><span>${esc(t('brand'))}</span></div>
       <span class="nav-ind"></span>
-      ${items.map(([p, i]) => `<button class="nav-item ${active === p ? 'active' : ''}" data-act="nav" data-v="${p}">${ic(i)}<span>${esc(t('nav.' + p))}</span></button>`).join('')}
+      ${items.map(([p, i]) => `<button class="nav-item ${active === p ? 'active' : ''}" data-act="nav" data-v="${p}" aria-label="${esc(t('nav.' + p))}" ${active === p ? 'aria-current="page"' : ''}>${ic(i)}${navLabel(t('nav.' + p))}</button>`).join('')}
       <div class="spacer"></div>
       <button class="nav-item" data-act="settings">${ic('settings')}<span>${esc(t('nav.settings'))}</span></button>`;
     fx('nav');
   }
 
   // Тема оформления: тёмная (по умолчанию) или светлая
-  const curTheme = () => document.documentElement.dataset.theme || 'dark';
+  const curTheme = () => document.documentElement.dataset.theme || 'light';
   function setTheme(v) {
     document.documentElement.dataset.theme = v;
     store.set('theme', v);
@@ -217,7 +215,7 @@
       </div>
       <button class="icon-btn" data-act="theme" title="${esc(t('theme.toggle'))}" aria-label="${esc(t('theme.toggle'))}">${ic(curTheme() === 'dark' ? 'sun' : 'moon')}</button>
       <button class="icon-btn" data-act="bell" title="${esc(t('notif.title'))}" aria-label="${esc(t('notif.title'))}">${ic('bell')}</button>
-      <button class="user-chip" data-act="settings" aria-label="${esc(t('nav.settings'))}">${avatar(u)}</button>`;
+      <button class="user-chip" data-act="settings" aria-label="${esc(initials(u.name) + ' - ' + t('nav.settings'))}">${avatar(u)}</button>`;
     fx('role');
   }
 
@@ -247,42 +245,40 @@
     const d = await api('/api/student/' + S.studentId + '/home');
     if (stale(tok)) return;
     const u = me();
-    const dueChip = { today: 'red', tomorrow: 'orange', week: '' };
     $('#main').innerHTML = `
-      <h1 class="page-title">${esc(t('hello', { name: firstName(u.name) }))}</h1>
-      <p class="page-sub">${esc(t('tagline'))}</p>
-      <div class="bento" style="margin-top:20px">
-        <section class="hero s8">
-          <h2>${esc(t('hero.s.title'))}</h2>
-          <p>${esc(t('hero.s.text'))}</p>
-          <button class="btn lg" data-act="continue">${ic('sparkle')}${esc(t('hero.s.btn'))}${ic('arrow')}</button>
-          ${heroArt('s')}
-        </section>
-        <div class="card prog-card s4" data-act="nav" data-v="courses">
-          <div class="ring-wrap">${ring(d.progress, true)}<div class="ring-num"><div class="stat-num">${d.progress}%</div></div></div>
-          <div class="stat-label">${esc(t('stat.progress'))}</div>
-        </div>
-      </div>
-      <div class="grid c2" style="margin-top:16px">
-        <div class="card stat-card" data-act="nav" data-v="lessons"><div class="stat-ico">${ic('calendar', '')}</div><div><div class="stat-num">${d.classesToday}</div><div class="stat-label">${esc(t('stat.classes'))}</div></div></div>
-        <div class="card stat-card" data-act="nav" data-v="lessons"><div class="stat-ico red">${ic('lessons')}</div><div><div class="stat-num">${d.tasksDue}</div><div class="stat-label">${esc(t('stat.tasks'))}</div></div></div>
-      </div>
+      <section class="block blk-blue home-hero">
+        <p class="eyebrow">${esc(todayLabel())}</p>
+        <h1 class="display" style="--chars:${longestWord(t('hello', { name: firstName(u.name) }))}">${helloHtml('hello', u.name)}</h1>
+        <p class="lead">${esc(t('tagline'))}</p>
+        <span class="sticker st-yellow" data-parallax aria-hidden="true">Copilot</span>${STAR_SHAPE}
+      </section>
+      ${marquee()}
+      <section class="bento s-bento">
+        <article class="cell c-coral cell-next" data-cursor="${esc(t('cursor.go'))}">
+          <p class="eyebrow">${esc(t('home.next'))}</p><h2 class="cell-title">${accentLast(t('hero.s.title'))}</h2><p>${esc(t('hero.s.text'))}</p>
+          <button class="btn lg cta" data-act="continue">${esc(t('hero.s.btn'))}${ic('arrow')}</button></article>
+        <button class="cell c-yellow cell-prog" data-act="nav" data-v="courses" aria-label="${esc(t('stat.progress'))}: ${d.progress}%">
+          <span class="eyebrow">${esc(t('stat.progress'))}</span>
+          <span class="big-num"><span class="stat-num">${d.progress}</span><span class="pct">%</span></span>
+          <span class="meter"><i style="width:${d.progress}%"></i></span></button>
+        <button class="cell c-ink" data-act="nav" data-v="lessons"><span class="stat-num">${d.lessonsDone}</span><span class="eyebrow">${esc(t('stat.done'))}</span></button>
+        <button class="cell c-lime" data-act="nav" data-v="lessons"><span class="stat-num">${d.tasksDue}</span><span class="eyebrow">${esc(t('stat.tasks'))}</span></button>
+      </section>
       <div class="section-head"><h2>${esc(t('home.courses'))}</h2><button class="link-btn" data-act="nav" data-v="courses">${esc(t('home.allCourses'))}${ic('arrow')}</button></div>
       <div class="grid c2">${d.courses.slice(0, 2).map((c) => courseCard(c, true)).join('')}</div>
       <div class="section-head"><h2>${esc(t('home.tasks'))}</h2><button class="link-btn" data-act="nav" data-v="lessons">${esc(t('home.allTasks'))}${ic('arrow')}</button></div>
       <div class="card">${d.tasks.length ? d.tasks.map((k, i) => `
-        <div class="task" data-act="openLesson" data-v="${esc(k.lessonId)}">
-          <span class="task-ico ${i % 2 ? 'purple' : ''}">${ic('file')}</span>
+        <div class="task" data-act="openLesson" data-v="${esc(k.lessonId)}" tabindex="0" role="link">
+          <span class="task-num">${String(i + 1).padStart(2, '0')}</span>
           <div class="info"><b>${esc(k.title)}</b><span>${esc(courseOf(k.courseId).title)}</span></div>
-          <span class="chip ${dueChip[k.due]}">${esc(t('due.' + k.due))}</span>
-          <span class="muted" style="font-size:14px">${esc(t('due.until'))}</span>${ic('chevron', 'muted')}
+          <span class="chip gray">${esc(t('steps.n', { n: k.steps }))}</span>${ic('chevron', 'muted')}
         </div>`).join('') : `<div class="empty">${esc(t('home.noTasks'))}</div>`}</div>`;
   }
 
   function courseCard(c, withBtn) {
     const prog = c.progress ?? null;
     return `<div class="card course-card">
-      <div class="top"><span class="course-ico ${esc(c.color)}">${ic(c.icon, '')}</span>
+      <div class="top">
         <div><h3>${esc(c.title)}</h3><div class="sub">${esc(c.subtitle)}</div></div></div>
       ${prog !== null ? `<div class="row" style="margin-bottom:14px"><div class="progress ${c.color === 'blue' ? '' : esc(c.color)}"><i style="width:${prog}%"></i></div><b>${prog}%</b></div>` : ''}
       ${withBtn ? `<button class="btn block" data-act="openCourse" data-v="${esc(c.id)}">${esc(t('continue'))}</button>` : ''}
@@ -298,20 +294,22 @@
       <span class="bar-name" title="${esc(l.title)}">${esc(l.title)}</span>
       <div class="progress" role="img" aria-label="${esc(l.title)}: ${l.avgScore}"><i style="width:${l.avgScore}%"></i></div><b>${l.avgScore}</b></div>`).join('');
     $('#main').innerHTML = `
-      <h1 class="page-title">${esc(t('hello.teacher', { name: firstName(u.name) }))}</h1>
-      <p class="page-sub">${esc(t('tagline.teacher'))}</p>
-      <section class="hero" style="margin-top:20px">
-        <h2>${esc(t('hero.t.title'))}</h2>
-        <p>${esc(t('hero.t.text'))}</p>
-        <button class="btn lg" data-act="nav" data-v="create">${ic('sparkle')}${esc(t('hero.t.btn'))}${ic('arrow')}</button>
-        ${heroArt('t')}
+      <section class="block blk-blue home-hero">
+        <p class="eyebrow">${esc(todayLabel())}</p>
+        <h1 class="display" style="--chars:${longestWord(t('hello.teacher', { name: firstName(u.name) }))}">${helloHtml('hello.teacher', u.name)}</h1>
+        <p class="lead">${esc(t('tagline.teacher'))}</p>
+        <span class="sticker st-yellow" data-parallax aria-hidden="true">Copilot</span>${STAR_SHAPE}
       </section>
-      <div class="grid c4" style="margin-top:18px">
-        ${statCol('lessons', '', d.lessonsCreated, t('stat.lessons'))}
-        ${statCol('users', 'green', `${d.studentsPassed}<small class="muted" style="font-size:16px"> ${esc(t('of'))} ${d.totalStudents}</small>`, t('stat.passed'))}
-        ${statCol('check', 'purple', d.avgScore, t('stat.avg'))}
-        ${statCol('sparkle', 'red', d.weeklyActive, t('stat.wau'))}
-      </div>
+      ${marquee('marquee.t')}
+      <section class="bento t-bento">
+        <article class="cell c-coral cell-next" data-cursor="${esc(t('cursor.go'))}">
+          <p class="eyebrow">${esc(t('home.next'))}</p><h2 class="cell-title">${accentLast(t('hero.t.title'))}</h2><p>${esc(t('hero.t.text'))}</p>
+          <button class="btn lg cta" data-act="nav" data-v="create">${ic('plus')}${esc(t('hero.t.btn'))}</button></article>
+        ${statCol('lessons', 'c-yellow', d.lessonsCreated, t('stat.lessons'))}
+        ${statCol('users', 'c-lime', `${d.studentsPassed}<small> ${esc(t('of'))} ${d.totalStudents}</small>`, t('stat.passed'))}
+        ${statCol('check', 'c-ink', d.avgScore, t('stat.avg'))}
+        ${statCol('calendar', 'c-blue', d.weeklyActive, t('stat.wau'))}
+      </section>
       <div class="section-head"><h2>${esc(t('chart.avg'))}</h2></div>
       <div class="card" style="padding:8px 20px">${barRows || `<div class="empty">${esc(t('lessons.empty'))}</div>`}</div>
       <div class="section-head"><h2>${esc(t('home.recent'))}</h2>
@@ -319,8 +317,8 @@
       <div class="card" style="padding:8px 12px">${lessonTable(lessons.slice().reverse().slice(0, 6))}</div>`;
   }
 
-  const statCol = (icon, color, num, label) => `<div class="card stat-card col" style="flex-direction:column;align-items:flex-start;gap:10px">
-    <div class="stat-ico ${color}">${ic(icon)}</div><div><div class="stat-num">${num}</div><div class="stat-label">${esc(label)}</div></div></div>`;
+  // Ячейка сводки: крупное число и подпись, color - цвет ячейки (c-yellow, c-lime, c-ink, c-blue). icon оставлен для совместимости
+  const statCol = (icon, color, num, label) => `<div class="cell stat-cell ${color}"><div class="stat-num">${num}</div><div class="eyebrow">${esc(label)}</div></div>`;
 
   function lessonActions(l) {
     return `<div class="actions">
@@ -368,8 +366,8 @@
       : (l.done ? `<span class="chip green">${ic('check')}${esc(t('done'))} · ${l.myScore}</span>` : '');
     return `<div class="card lesson-card" data-act="openLesson" data-v="${esc(l.id)}">
       <div class="meta"><span class="chip ${courseChipClass(c)}">${esc(c.title)}</span><span class="chip gray">${esc(t('steps.n', { n: steps }))}</span>${status}</div>
-      <h3>${esc(l.title)}</h3>
-      <div class="muted" style="font-size:14px">${esc(l.goals.slice(0, 2).join('; '))}</div>
+      <h3><a href="#/lesson/${esc(l.id)}">${esc(l.title)}</a></h3>
+      <div class="muted">${esc(l.goals.slice(0, 2).join('; '))}</div>
       <div class="foot">${isT ? lessonActions(l) : `<span></span><button class="btn sm">${esc(t(l.done ? 'repeat' : 'start'))}${ic('arrow')}</button>`}</div>
     </div>`;
   }
@@ -383,7 +381,7 @@
       <div style="margin-top:10px"><h1 class="h1">${esc(t('nav.courses'))}</h1><p class="muted" style="margin-top:4px">${esc(t('courses.sub'))}</p></div>
       <div class="grid c2" style="margin-top:16px">
         ${list.map((c) => `<div class="card course-card">
-          <div class="top"><span class="course-ico ${esc(c.color)}">${ic(c.icon)}</span><div><h3>${esc(c.title)}</h3><div class="sub">${esc(c.subtitle)}</div></div></div>
+          <div class="top"><div><h3>${esc(c.title)}</h3><div class="sub">${esc(c.subtitle)}</div></div></div>
           <div class="row" style="margin-bottom:14px">
             <span class="chip ${c.type === 'language' ? 'purple' : ''}">${esc(t('ctype.' + c.type))}</span>
             <span class="chip gray">${esc(t('lessons.n', { n: c.lessonsCount }))}</span>
@@ -391,7 +389,6 @@
           </div>
           <button class="btn block ${c.lessonsCount ? '' : 'ghost'}" data-act="openCourse" data-v="${esc(c.id)}">${esc(t(c.lessonsCount ? 'course.open' : 'course.soon'))}</button>
         </div>`).join('')}
-        <div class="card add-card"><div>${ic('plus')}<div style="margin-top:6px;font-weight:700">${esc(t('course.new'))}</div><div style="font-size:13px;margin-top:4px">${esc(t('course.new.sub'))}</div></div></div>
       </div>`;
   }
 
@@ -424,7 +421,7 @@
 
     $('#main').innerHTML = `
       <div class="row between" style="margin-top:10px"><div><h1 class="h1">${esc(t('nav.rating'))}</h1><p class="muted" style="margin-top:4px">${esc(t('rating.sub'))}</p></div>
-        <select class="select" data-change="ratingMonth">${d.months.map((m) => `<option value="${m}" ${m === d.month ? 'selected' : ''}>${esc(monthLabel(m))}</option>`).join('')}</select></div>
+        <select class="select" data-change="ratingMonth" aria-label="${esc(t('rating.month'))}">${d.months.map((m) => `<option value="${m}" ${m === d.month ? 'selected' : ''}>${esc(monthLabel(m))}</option>`).join('')}</select></div>
       ${hint}
       ${rows.length ? `<div class="podium">${order.map(medal).join('')}</div>` : `<div class="empty">${esc(t('r.empty'))}</div>`}
       ${rest.length ? `<div class="card" style="margin-top:18px;padding:8px 12px"><table class="table"><thead><tr><th>#</th><th>${esc(t('th.student'))}</th><th>${esc(t('r.lessons'))}</th><th>${esc(t('r.avg'))}</th><th>${esc(t('r.activity'))}</th><th>${esc(t('r.points'))}</th></tr></thead><tbody>
@@ -433,7 +430,7 @@
           <td data-l="${esc(t('r.lessons'))}">${r.lessons}</td><td data-l="${esc(t('r.avg'))}">${r.avgGrade}</td><td data-l="${esc(t('r.activity'))}">${r.activity}%</td><td data-l="${esc(t('r.points'))}"><b>${r.points}</b></td></tr>`).join('')}</tbody></table></div>` : ''}
       <div class="note-box">${esc(t('rating.formula', { n: d.target }))}</div>
       ${S.role === 'teacher' ? `<div class="section-head"><h2>${esc(t('r.awards'))}</h2><a class="btn ghost sm" href="/api/grades.xlsx?month=${esc(d.month)}" download>${ic('table')}${esc(t('act.excelAll'))}</a></div>
-        <div class="card">${top.length ? top.map((r) => `<div class="task" style="cursor:default"><span class="task-ico">${ic('trophy')}</span><div class="info"><b>${r.rank}. ${esc(r.name)}</b><span>${esc(t('prize.' + r.rank))}</span></div><span class="chip">${r.points}</span></div>`).join('') : `<div class="empty">${esc(t('r.empty'))}</div>`}</div>` : ''}`;
+        <div class="card">${top.length ? top.map((r) => `<div class="task" style="cursor:default"><span class="task-num">${r.rank}</span><div class="info"><b>${r.rank}. ${esc(r.name)}</b><span>${esc(t('prize.' + r.rank))}</span></div><span class="chip">${r.points}</span></div>`).join('') : `<div class="empty">${esc(t('r.empty'))}</div>`}</div>` : ''}`;
       fx('podium');
     if (mine && mine.rank <= 3) setTimeout(() => fx('celebrate', 'big'), 2100);
   }
@@ -646,9 +643,9 @@
 
   function renderPanel() {
     const fab = $('#fab');
-    if (fab) { fab.innerHTML = ic('sparkle'); fab.setAttribute('aria-label', t('panel.open')); }
+    if (fab) { fab.innerHTML = ic('chat'); fab.setAttribute('aria-label', t('panel.open')); }
     const isLesson = S.page === 'lesson' && S.role === 'student' && P;
-    const head = `<div class="cop-head"><div class="cop-logo"><img class="cop-img" src="img/copilot.svg" alt="" hidden onerror="this.onerror=null;this.src='img/copilot.png'" onload="this.hidden=false;this.nextElementSibling.style.display='none';this.parentNode.classList.add('has-img')">${ic('sparkle')}</div><div style="flex:1"><b>${esc(t('cop.name'))}</b><span class="online"><i></i>${esc(t('cop.online'))}</span></div><span class="badge-mode ${S.config.mock ? '' : 'gpt'}">${esc(t(S.config.mock ? 'mode.demo' : 'mode.gpt'))}</span><button class="cop-close" data-act="panel" aria-label="${esc(t('panel.close'))}">${ic('close')}</button></div>`;
+    const head = `<div class="cop-head"><div class="cop-logo" aria-hidden="true">${ic('chat')}</div><div style="flex:1"><b>${esc(t('cop.name'))}</b><span class="online"><i></i>${esc(t('cop.online'))}</span></div><span class="badge-mode ${S.config.mock ? '' : 'gpt'}">${esc(t(S.config.mock ? 'mode.demo' : 'mode.gpt'))}</span><button class="cop-close" data-act="panel" aria-label="${esc(t('panel.close'))}">${ic('close')}</button></div>`;
     if (S.page === 'game') { $('#panel').innerHTML = gamePanel(head); return; }
     if (isLesson) {
       $('#panel').innerHTML = `<div class="copilot">${head}<div id="chat" class="chat"></div>
@@ -662,8 +659,8 @@
         <div class="msg bot">${esc(t(isT ? 'cop.hello.t' : 'cop.hello.s', { name: firstName(me().name) }))}</div>
         <div class="msg bot">${esc(t(isT ? 'cop.can.t' : 'cop.can.s'))}</div></div>
       <div class="quick">${isT
-        ? `<button data-act="nav" data-v="create">${ic('sparkle')}${esc(t('cop.q.create'))}</button><button data-act="nav" data-v="rating">${ic('trophy')}${esc(t('nav.rating'))}</button>`
-        : `<button data-act="continue">${ic('sparkle')}${esc(t('cop.q.continue'))}</button><button data-act="nav" data-v="rating">${ic('trophy')}${esc(t('nav.rating'))}</button>`}</div>
+        ? `<button data-act="nav" data-v="create">${ic('plus')}${esc(t('cop.q.create'))}</button><button data-act="nav" data-v="rating">${ic('trophy')}${esc(t('nav.rating'))}</button>`
+        : `<button data-act="continue">${ic('lessons')}${esc(t('cop.q.continue'))}</button><button data-act="nav" data-v="rating">${ic('trophy')}${esc(t('nav.rating'))}</button>`}</div>
       <div class="cop-info">${esc(t(isT ? 'cop.info.t' : 'cop.info.s'))}</div></div>`;
     fx('panel');
   }
@@ -683,7 +680,7 @@
     const head = `<div class="player-head"><button class="back" data-act="nav" data-v="lessons" aria-label="${esc(t('back'))}">${ic('back')}</button><h1 class="h1">${esc(t('hero.t.btn'))}</h1></div>`;
     if (C.loading) {
       $('#main').innerHTML = head + `<div class="card gen" role="status" aria-live="polite">
-        <div class="orb"><i></i><i></i><i></i><b>${ic('sparkle')}</b></div>
+        <div class="orb"><i></i><i></i><i></i><b>${ic('pen')}</b></div>
         <h3>${esc(t('create.generating'))}</h3><div class="status" id="gen-status">${esc(t('gen.s1'))}</div>
         <div class="bar"><i></i></div>
         <div class="skels"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div></div>`;
@@ -702,7 +699,7 @@
           <label class="field-l">${esc(t('f.lang'))}<select data-form="language"><option value="ru" ${f.language === 'ru' ? 'selected' : ''}>Русский</option><option value="kk" ${f.language === 'kk' ? 'selected' : ''}>Қазақша</option></select></label>
           <label class="field-l">${esc(t('f.course'))}<select data-form="courseId">${S.courses.map((c) => `<option value="${esc(c.id)}" ${f.courseId === c.id ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select></label>
         </div>
-        <div><button class="btn lg" data-act="generate">${ic('sparkle')}${esc(t('generate'))}</button></div></div>`;
+        <div><button class="btn lg" data-act="generate">${ic('pen')}${esc(t('generate'))}</button></div></div>`;
       return;
     }
     const d = C.draft;
@@ -716,7 +713,7 @@
           <label class="field-l">${esc(t('notes.e.terms'))}<textarea data-d="notes:terms">${esc((d.notes.terms || []).map((x) => x.term + ' - ' + x.def).join('\n'))}</textarea></label>
           <label class="field-l">${esc(t('notes.example'))}<textarea data-d="notes:example">${esc(d.notes.example || '')}</textarea></label></div>` : ''}
         ${d.steps.map((s, i) => `<div class="step-edit"><span class="chip ${s.type === 'question' ? 'purple' : ''}">${esc(t('step'))} ${i + 1} · ${esc(t('stype.' + s.type))}</span>
-          <textarea class="ta" data-d="step:${i}:text" style="border:1.5px solid #d4def2;border-radius:12px;padding:12px;min-height:80px">${esc(s.text)}</textarea>
+          <textarea class="ta" data-d="step:${i}:text">${esc(s.text)}</textarea>
           ${s.type === 'question' ? `<div class="grid c2"><label class="field-l">${esc(t('answer'))}<input data-d="step:${i}:correctAnswer" value="${esc(s.correctAnswer)}"></label><label class="field-l">${esc(t('hint'))}<input data-d="step:${i}:hint" value="${esc(s.hint || '')}"></label></div>` : ''}</div>`).join('')}
         <div class="row"><button class="btn lg green" data-act="publish">${ic('check')}${esc(t('publish'))}</button>
           <button class="btn lg ghost" data-act="generate">${ic('refresh')}${esc(t('regenerate'))}</button>
@@ -1007,7 +1004,7 @@
           <ol class="g-how">${[1, 2, 3, 4].map((i) => `<li><span class="num">${i}</span>${esc(t('g.how' + i))}</li>`).join('')}</ol>
           <div class="field-l">${esc(t('g.teams'))}</div>
           <div class="filters g-count">${[2, 3, 4, 5, 6].map((n) => `<button class="filter ${G.count === n ? 'active' : ''}" data-act="gCount" data-v="${n}">${n}</button>`).join('')}</div>
-          <div><button class="btn lg" data-act="gCreate">${ic('sparkle')}${esc(t('g.create'))}</button></div></div>`;
+          <div><button class="btn lg" data-act="gCreate">${ic('flag')}${esc(t('g.create'))}</button></div></div>`;
     }
     const url = (S.config.lan && S.config.lan[0]) || location.origin;
     const pi = g.phases.indexOf(g.phase);
@@ -1081,7 +1078,7 @@
       body = `<div class="card g-intro"><span class="chip">${esc(t('g.ph.lesson'))}</span><h2>${esc(g.lessonTitle)}</h2>
         ${tm.lesson ? `<div class="feedback ok">${esc(t('g.lesson.got', { n: tm.lesson.score }))}</div>
           <div class="step-actions"><button class="btn ghost" data-act="openLesson" data-v="${esc(g.lessonId)}">${esc(t('repeat'))}</button></div>`
-        : `<p class="muted">${esc(t('g.lesson.s'))}</p><div class="step-actions"><button class="btn lg" data-act="openLesson" data-v="${esc(g.lessonId)}">${ic('sparkle')}${esc(t('g.lesson.open'))}${ic('arrow')}</button></div>`}</div>`;
+        : `<p class="muted">${esc(t('g.lesson.s'))}</p><div class="step-actions"><button class="btn lg" data-act="openLesson" data-v="${esc(g.lessonId)}">${ic('lessons')}${esc(t('g.lesson.open'))}${ic('arrow')}</button></div>`}</div>`;
     } else if (g.phase === 'quest') body = questHtml(g);
     else {
       const place = sortedTeams(g).findIndex((x) => x.id === m.id) + 1;
@@ -1116,12 +1113,12 @@
       task = `<div class="g-sents">${lock.sentences.map((s, i) => `<button class="g-sent ${picked.includes(i) ? 'picked' : ''}" data-act="gPick" data-v="${i}" aria-pressed="${picked.includes(i)}"><span class="g-let">${i + 1}</span><span>${esc(s)}</span></button>`).join('')}</div>`;
     }
     const fb = G.fb && G.fb.lock === lock.id ? `<div class="feedback bad">${esc(G.fb.text)}</div>` : '';
-    const hints = st.hints.map((h) => `<div class="g-hint"><span class="cop-mini">${ic('sparkle')}</span><span>${esc(h)}</span></div>`).join('');
+    const hints = st.hints.map((h) => `<div class="g-hint"><span class="cop-mini">${ic('chat')}</span><span>${esc(h)}</span></div>`).join('');
     return map + `<div class="card step-card g-lock"><div class="row between"><span class="chip red">${ic('lock')}${esc(t('g.lock', { n: cur.n + 1 }))}</span><span class="chip gray">${esc(t('g.lock.pts', { p: lock.points, now }))}</span></div>
       <h2 class="g-lock-title">${esc(lock.title)}</h2><p class="text">${esc(lock.task)}</p>
       ${task}${fb}${hints}
       <div class="step-actions">
-        ${st.hintsLeft > 0 ? `<button class="btn ghost" data-act="gHint">${ic('sparkle')}${esc(t('g.hint', { n: qs.hintCost }))}</button>` : ''}
+        ${st.hintsLeft > 0 ? `<button class="btn ghost" data-act="gHint">${ic('bulb')}${esc(t('g.hint', { n: qs.hintCost }))}</button>` : ''}
         <button class="btn lg" data-act="gCheck">${ic('unlock')}${esc(t('g.check'))}</button></div></div>`;
   }
 
@@ -1135,7 +1132,7 @@
     else if (g.phase === 'quiz') msgs = [t('g.cop.quiz')];
     else if (g.phase === 'lesson') {
       msgs = [t('g.cop.lesson')];
-      quick = `<button data-act="openLesson" data-v="${esc(g.lessonId)}">${ic('sparkle')}${esc(t('g.lesson.open'))}</button>`;
+      quick = `<button data-act="openLesson" data-v="${esc(g.lessonId)}">${ic('lessons')}${esc(t('g.lesson.open'))}</button>`;
     } else if (g.phase === 'quest') {
       const cur = curLock();
       if (!cur) msgs = [t('g.cop.done')];
@@ -1162,16 +1159,18 @@
   // ---------- Настройки ----------
   function openSettings() {
     const students = S.users.filter((u) => u.role === 'student');
-    $('#modal-root').innerHTML = `<div class="modal-bg" data-act="closeModal"><div class="modal">
-      <div class="row between"><h2>${esc(t('nav.settings'))}</h2><button class="icon-btn" data-act="closeModal">${ic('close')}</button></div>
+    $('#modal-root').innerHTML = `<div class="modal-bg" data-act="closeModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="set-title">
+      <div class="row between"><h2 id="set-title">${esc(t('nav.settings'))}</h2><button class="icon-btn" data-act="closeModal" aria-label="${esc(t('panel.close'))}">${ic('close')}</button></div>
       <div class="set-row"><div>${esc(t('set.lang'))}</div><div class="lang-switch"><button class="${S.lang === 'ru' ? 'active' : ''}" data-act="lang" data-v="ru">RU</button><button class="${S.lang === 'kk' ? 'active' : ''}" data-act="lang" data-v="kk">KZ</button></div></div>
-      ${S.role === 'student' && !S.team ? `<div class="set-row"><div>${esc(t('set.student'))}<small>${esc(t('set.student.sub'))}</small></div><select class="select" data-change="setStudent">${students.map((u) => `<option value="${u.id}" ${u.id === S.studentId ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>` : ''}
-      ${S.role === 'teacher' ? `<div class="set-row"><div>${esc(t('set.mock'))}<small>${esc(S.config.hasKey ? t('set.mock.sub') : t('set.mock.nokey'))}</small></div><button class="toggle ${S.config.mock ? 'on' : ''}" data-act="toggleMock" aria-label="mock"></button></div>` : ''}
+      ${S.role === 'student' && !S.team ? `<div class="set-row"><div>${esc(t('set.student'))}<small>${esc(t('set.student.sub'))}</small></div><select class="select" data-change="setStudent" aria-label="${esc(t('set.student'))}">${students.map((u) => `<option value="${u.id}" ${u.id === S.studentId ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>` : ''}
+      ${S.role === 'teacher' ? `<div class="set-row"><div>${esc(t('set.mock'))}<small>${esc(S.config.hasKey ? t('set.mock.sub') : t('set.mock.nokey'))}</small></div><button class="toggle ${S.config.mock ? 'on' : ''}" data-act="toggleMock" role="switch" aria-checked="${S.config.mock}" aria-label="${esc(t('set.mock'))}"></button></div>` : ''}
       ${S.role === 'teacher' ? `<div class="set-row"><div>${esc(t('set.reset'))}<small>${esc(t('set.reset.sub'))}</small></div><button class="btn ghost sm" data-act="resetDemo">${ic('refresh')}${esc(t('set.reset.btn'))}</button></div>` : ''}
       <div class="set-row"><div>${esc(t('set.logout'))}<small>${esc(t('set.logout.sub'))}</small></div><button class="btn ghost sm" data-act="logout">${ic('logout')}${esc(t('set.logout'))}</button></div>
     </div></div>`;
   }
   const closeModal = () => { $('#modal-root').innerHTML = ''; };
+  // После открытия окна фокус ставим на крестик, чтобы с клавиатуры можно было сразу работать в окне
+  const focusModal = () => { const b = $('#modal-root .modal .icon-btn'); if (b) b.focus(); };
 
   async function resetDemo() {
     if (!confirm(t('reset.confirm'))) return;
@@ -1194,7 +1193,7 @@
       if (S.page === 'lesson' && P) { renderSidebar(); renderTop(); renderPlayer(); renderPanel(); } else route();
       if (open) openSettings();
     },
-    settings: openSettings,
+    settings: () => { openSettings(); focusModal(); },
     panel: () => togglePanel(),
     theme: () => setTheme(curTheme() === 'dark' ? 'light' : 'dark'),
     closeModal,
@@ -1345,7 +1344,7 @@
     if (!el) return;
     if (el.classList.contains('modal-bg') && e.target !== el) return; // клик внутри модалки не закрывает её
     const fn = handlers[el.dataset.act];
-    if (fn) fn(el.dataset.v, el, e);
+    if (fn) Promise.resolve().then(() => fn(el.dataset.v, el, e)).catch((err) => { console.warn(err); toast(err.message || t('error')); });
   });
 
   document.addEventListener('input', (e) => {
@@ -1360,10 +1359,23 @@
     const el = e.target;
     if (el.dataset.form && C) C.form[el.dataset.form] = el.value;
     if (el.dataset.change === 'ratingMonth') { S.ratingMonth = el.value; route(); }
-    if (el.dataset.change === 'setStudent') { S.studentId = el.value; store.set('studentId', el.value); closeModal(); renderTop(); route(); }
+    if (el.dataset.change === 'setStudent') {
+      // Выбор студента записываем и в сохранённый вход, иначе после перезагрузки вернётся прежний студент
+      store.set('studentId', el.value);
+      if (S.session && S.session.role === 'student') saveSession({ ...S.session, studentId: el.value });
+      S.studentId = el.value;
+      closeModal(); renderTop(); route();
+    }
   });
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('#modal-root').innerHTML) { closeModal(); return; }
+    // Элементы-ссылки, сделанные не из <a>/<button> (строки заданий), открываются клавишами Enter и пробел
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.act && e.target.getAttribute('role') === 'link') {
+      e.preventDefault();
+      e.target.click();
+      return;
+    }
     if (e.key === 'Enter') {
       if (e.target.id === 'ans') doCheck();
       else if (e.target.id === 'a-code') handlers.authCode();

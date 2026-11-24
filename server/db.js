@@ -5,7 +5,8 @@ const path = require('path');
 const SOURCE_DIR = path.join(__dirname, '..', 'data');
 // На Vercel папка проекта только для чтения, поэтому данные лежат во временной /tmp.
 // Они сбрасываются при перезапуске функции, для демо этого достаточно.
-const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : SOURCE_DIR;
+// DATA_DIR из окружения нужен тестам: они работают с копией данных и не портят настоящие.
+const DATA_DIR = process.env.DATA_DIR || (process.env.VERCEL ? path.join('/tmp', 'data') : SOURCE_DIR);
 if (DATA_DIR !== SOURCE_DIR && !fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   if (fs.existsSync(SOURCE_DIR)) {
