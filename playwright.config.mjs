@@ -12,7 +12,8 @@ export default defineConfig({
   reporter: [['list']],
   expect: {
     timeout: 10_000,
-    toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: 'disabled' },
+    // Строгий порог: даже смена одной надписи (например, названия) должна ловиться
+    toHaveScreenshot: { maxDiffPixels: 200, animations: 'disabled' },
   },
   use: {
     baseURL: `http://localhost:${PORT}`,
