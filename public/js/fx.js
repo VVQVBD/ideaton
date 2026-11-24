@@ -9,7 +9,9 @@
   const ok = () => !!g && !RM.matches;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
-  const COLORS = ['#8b6dff', '#fbbf24', '#f472b6', '#34d399', '#22d3ee', '#ffffff'];
+  const COLORS = ['#2b3bff', '#d4ff3a', '#ff5a36', '#ffc700', '#111111'];
+  // Плавность из дизайн-токенов: cubic-bezier(0.2, 0.8, 0.2, 1)
+  const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
   // Безопасные обёртки: если целей для анимации нет, GSAP не вызывается
   const T = (x) => (Array.isArray(x) ? x : x ? [x] : []);
@@ -29,43 +31,28 @@
     heroTweens = [];
     if (!ok()) return;
 
-    // Блоки верхнего уровня; у сеток берём дочерние карточки
-    const blocks = [];
-    Array.from(main.children).forEach((el) => {
-      if (el.classList.contains('podium')) return;
-      if (el.classList.contains('grid') || el.classList.contains('bento')) blocks.push(...el.children); else blocks.push(el);
-    });
-    const list = blocks.slice(0, 14);
-    if (list.length) {
-      from(list, {
-        opacity: 0, y: 18, duration: 0.5, ease: 'power2.out',
-        stagger: Math.min(0.05, 0.5 / list.length), clearProps: 'transform,opacity',
-      });
-    }
-    from($$('.stat-ico, .course-ico, .task-ico', main).slice(0, 14), {
-      scale: 0.5, rotation: -25, opacity: 0, duration: 0.5, ease: 'back.out(2.2)', stagger: 0.04, delay: 0.15, clearProps: 'transform,opacity',
-    });
     words(main);
+    // Ячейки bento и карточки появляются с лёгким пружинящим сдвигом
+    from($$('.bento > .cell, .grid > .card', main).slice(0, 12), { y: 24, opacity: 0, duration: 0.55, ease: 'back.out(1.4)', stagger: 0.06, delay: 0.15, clearProps: 'transform,opacity' });
+    from($$('.sticker, .shape-star', main), { scale: 0, rotation: -40, duration: 0.6, ease: 'back.out(2.2)', delay: 0.45, stagger: 0.1, clearProps: 'transform' });
     countUps(main);
-    rings(main);
     bars(main);
-    hero(main);
   }
 
-  // Заголовок появляется по словам
+  // Крупные заголовки появляются по словам снизу из-под маски
   function words(root) {
-    $$('.page-title, .hero h2, .h1', root).slice(0, 3).forEach((el) => {
+    $$('.display, .h1, .cell-title, .section-head h2', root).slice(0, 8).forEach((el) => {
       if (el.dataset.w) return;
       el.dataset.w = '1';
       const wrap = (node) => {
         Array.from(node.childNodes).forEach((n) => {
           if (n.nodeType === 3) {
             const frag = document.createDocumentFragment();
-            n.nodeValue.split(/(\s+)/).forEach((p) => {
-              if (!p) return;
-              if (/^\s+$/.test(p)) { frag.appendChild(document.createTextNode(p)); return; }
+            n.nodeValue.split(/(\s+)/).forEach((part) => {
+              if (!part) return;
+              if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
               const w = document.createElement('span'); w.className = 'w';
-              const i = document.createElement('span'); i.className = 'wi'; i.textContent = p;
+              const i = document.createElement('span'); i.className = 'wi'; i.textContent = part;
               w.appendChild(i); frag.appendChild(w);
             });
             node.replaceChild(frag, n);
@@ -75,7 +62,7 @@
       wrap(el);
     });
     if (!ok()) return;
-    from($$('.page-title .wi, .hero h2 .wi, .h1 .wi', root), { yPercent: 110, rotation: 4, duration: 0.7, ease: 'power3.out', stagger: 0.06, clearProps: 'transform' });
+    from($$('.display .wi, .h1 .wi, .cell-title .wi, .section-head h2 .wi', root), { yPercent: 110, duration: 0.7, ease: 'power3.out', stagger: 0.05, clearProps: 'transform' });
   }
 
   // Числа "набегают" от нуля
@@ -101,37 +88,11 @@
     });
   }
 
-  // Кольцо прогресса дорисовывается
-  function rings(root) {
-    if (!ok()) return;
-    $$('.ring circle:last-child', root).forEach((c) => {
-      const a = c.getAttribute('stroke-dasharray');
-      fromTo(c, { attr: { 'stroke-dasharray': '0 100' } }, { attr: { 'stroke-dasharray': a }, duration: 1.2, ease: 'power3.out', delay: 0.25 });
-    });
-  }
-
   // Полоски прогресса и столбики диаграммы растут слева направо
   function bars(root) {
     if (!ok()) return;
     const list = $$('.progress > i', root);
     from(list, { scaleX: 0, transformOrigin: 'left center', duration: 0.9, ease: 'power3.out', delay: 0.25, stagger: 0.06, clearProps: 'transform' });
-  }
-
-  // Главный экран: плавающая картинка, мерцающие звёздочки, парящие плашки
-  function hero(root) {
-    const art = $('.hero .art', root);
-    if (!art) return;
-    const logo = $('.art-logo', art);
-    from($$('.hero h2, .hero > p, .hero .btn', root), { opacity: 0, x: -24, duration: 0.6, ease: 'power3.out', stagger: 0.1, delay: 0.1, clearProps: 'transform,opacity' });
-    from(logo, { scale: 0.4, rotation: -18, opacity: 0, duration: 0.9, ease: 'back.out(1.7)', delay: 0.2 });
-    from($$('.float-chip', art), { opacity: 0, scale: 0.6, y: 16, duration: 0.6, ease: 'back.out(2)', stagger: 0.2, delay: 0.7 });
-    pushT(to(logo, { y: -10, rotation: 2, duration: 2.6, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1 }));
-    $$('.float-chip', art).forEach((c, i) => {
-      pushT(to(c, { y: i % 2 ? 8 : -8, duration: 2.2 + i * 0.4, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1 + i * 0.3 }));
-    });
-    $$('.spark', art).forEach((s, i) => {
-      pushT(fromTo(s, { scale: 0.3, opacity: 0.2, rotation: 0 }, { scale: 1, opacity: 1, rotation: 45, duration: 1.2 + i * 0.3, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: i * 0.4 }));
-    });
   }
 
   // ---------- Навигация: плавные индикаторы ----------
@@ -195,7 +156,7 @@
   function step() {
     if (!ok()) return;
     const card = $('.step-card');
-    if (card) from(card, { x: 48, opacity: 0, duration: 0.45, ease: 'power3.out', clearProps: 'transform,opacity' });
+    if (card) from(card, { x: 24, opacity: 0, duration: 0.45, ease: 'power3.out', clearProps: 'transform,opacity' });
     const items = $$('.step-card .text, .step-card .q, .step-card .answer-row');
     from(items, { y: 10, opacity: 0, duration: 0.4, stagger: 0.08, delay: 0.12, ease: 'power2.out', clearProps: 'transform,opacity' });
     const now = $('.steps-bar i.now');
@@ -245,13 +206,12 @@
       if (!c) return;
       const t0 = i * 0.38;
       tl.fromTo($('.ped', c), { scaleY: 0, transformOrigin: '50% 100%' }, { scaleY: 1, duration: 0.55, ease: 'power3.out' }, t0)
-        .fromTo($('.pod', c), { y: -140, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: 'bounce.out', clearProps: 'transform,opacity' }, t0 + 0.25)
-        .from($('.medal', c), { scale: 0, rotation: -360, duration: 0.6, ease: 'back.out(2)' }, t0 + 0.6)
+        .fromTo($('.pod', c), { y: -60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'back.out(1.4)', clearProps: 'transform,opacity' }, t0 + 0.25)
+        .from($('.medal', c), { scale: 0, duration: 0.5, ease: 'back.out(2)' }, t0 + 0.6)
         .from($('.pod .avatar', c), { scale: 0.4, opacity: 0, duration: 0.5, ease: 'back.out(2.4)' }, t0 + 0.6);
       const crown = $('.crown', c);
       if (crown) {
-        tl.fromTo(crown, { y: -60, scale: 0, rotation: -30, opacity: 0 }, { y: 0, scale: 1, rotation: 0, opacity: 1, duration: 0.7, ease: 'back.out(2.2)' }, t0 + 0.8)
-          .add(() => { pushT(to(crown, { y: -4, rotation: 3, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' })); }, '>');
+        tl.fromTo(crown, { y: -20, scale: 0.5, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(2)' }, t0 + 0.8);
       }
     });
     tl.add(() => confetti({ particleCount: 60, spread: 80, startVelocity: 32, origin: { x: 0.5, y: 0.45 }, scalar: 0.9 }), '-=0.2');
@@ -312,68 +272,73 @@
     burstAt(el, 24);
   }
 
-  // ---------- Глобальные эффекты: наклон карточек, подсветка hero, волна на кнопках ----------
-  const TILT = '.lesson-card, .course-card, .stat-card, .pod';
-  const MAG = '.btn.lg';
-  function initGlobal() {
-    document.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'touch' || !e.target.closest) return;
-      const card = e.target.closest('.card, .hero');
-      if (card) {
-        const cr = card.getBoundingClientRect();
-        card.style.setProperty('--mx', e.clientX - cr.left + 'px');
-        card.style.setProperty('--my', e.clientY - cr.top + 'px');
-      }
-      if (ok()) {
-        const au = $('.aurora');
-        if (au) to(au, { x: (e.clientX / window.innerWidth - 0.5) * -34, y: (e.clientY / window.innerHeight - 0.5) * -34, duration: 1.2, ease: 'power2.out', overwrite: 'auto' });
-        const mg = e.target.closest(MAG);
-        if (mg) {
-          const mr = mg.getBoundingClientRect();
-          to(mg, { x: (e.clientX - mr.left - mr.width / 2) * 0.12, y: (e.clientY - mr.top - mr.height / 2) * 0.2, duration: 0.3, overwrite: 'auto' });
-        }
-      }
-      const h = e.target.closest('.hero');
-      if (h) {
-        const r = h.getBoundingClientRect();
-        h.style.setProperty('--mx', e.clientX - r.left + 'px');
-        h.style.setProperty('--my', e.clientY - r.top + 'px');
-      }
-      if (!ok()) return;
-      const el = e.target.closest(TILT);
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width - 0.5;
-      const py = (e.clientY - r.top) / r.height - 0.5;
-      to(el, { rotationY: px * 6, rotationX: -py * 6, y: -3, transformPerspective: 900, duration: 0.35, ease: 'power2.out', overwrite: 'auto' });
-    });
-    document.addEventListener('pointerout', (e) => {
-      if (!ok() || !e.target.closest) return;
-      const mg = e.target.closest(MAG);
-      if (mg && !mg.contains(e.relatedTarget)) to(mg, { x: 0, y: 0, duration: 0.5, ease: 'elastic.out(1,0.5)', clearProps: 'transform' });
-      const el = e.target.closest(TILT);
-      if (el && !el.contains(e.relatedTarget)) to(el, { rotationX: 0, rotationY: 0, y: 0, duration: 0.5, ease: 'power3.out', clearProps: 'transform' });
-    });
-    document.addEventListener('pointerdown', (e) => {
-      if (RM.matches || !e.target.closest) return;
-      const b = e.target.closest('.btn:not([disabled]), .quick button, .send');
-      if (!b) return;
-      const r = b.getBoundingClientRect();
-      const s = Math.max(r.width, r.height) * 2;
-      const span = document.createElement('span');
-      span.className = 'ripple';
-      span.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`;
-      b.appendChild(span);
-      setTimeout(() => span.remove(), 650);
-    });
-  }
-  initGlobal();
-
   // При повороте экрана и смене размера индикаторы встают на новое место
   let rt;
   window.addEventListener('resize', () => {
     clearTimeout(rt);
     rt = setTimeout(() => { last.nav = null; last.role = null; nav(); role(); }, 150);
+  });
+
+  // ---------- Бегущая строка: ускоряется и меняет направление при прокрутке ----------
+  let mqBoost = 0;
+  let lastY = 0;
+  function onScroll(y) {
+    const dy = y - lastY;
+    lastY = y;
+    if (RM.matches) return;
+    mqBoost = Math.max(-6, Math.min(6, mqBoost + dy * 0.05));
+    if (!mqRunning && $('.mq-track')) { mqRunning = true; requestAnimationFrame(mqLoop); }
+    // Параллакс: стикеры и звёзды едут чуть медленнее страницы
+    $$('[data-parallax]').forEach((el, i) => { el.style.translate = `0 ${(y * (0.12 + i * 0.05)).toFixed(1)}px`; });
+  }
+  let mqRunning = false;
+  function mqLoop() {
+    const dir = mqBoost < 0 ? -1 : 1;
+    const rate = dir * (1 + Math.abs(mqBoost));
+    $$('.mq-track').forEach((tr) => tr.getAnimations().forEach((a) => { a.playbackRate = rate; }));
+    mqBoost *= 0.92;
+    // Ускорение затухло: возвращаем обычную скорость и останавливаем цикл до следующей прокрутки
+    if (Math.abs(mqBoost) < 0.01) {
+      mqBoost = 0;
+      $$('.mq-track').forEach((tr) => tr.getAnimations().forEach((a) => { a.playbackRate = 1; }));
+      mqRunning = false;
+      return;
+    }
+    requestAnimationFrame(mqLoop);
+  }
+  // На компьютере прокручивается #main, на телефоне - вся страница
+  document.addEventListener('scroll', (e) => {
+    const t = e.target;
+    if (t === document) onScroll(window.scrollY);
+    else if (t && t.id === 'main') onScroll(t.scrollTop);
+  }, true);
+
+  // ---------- Магнитная главная кнопка и курсор-стикер (только мышь) ----------
+  const FINE = window.matchMedia ? window.matchMedia('(hover: hover) and (pointer: fine)') : { matches: false };
+  const cur = document.createElement('div');
+  cur.className = 'cursor-sticker';
+  cur.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(cur);
+  document.addEventListener('pointermove', (e) => {
+    if (!FINE.matches || !e.target.closest) return;
+    const zone = e.target.closest('[data-cursor]');
+    const overBtn = e.target.closest('button, a, input');
+    if (zone && !overBtn && !RM.matches) {
+      cur.textContent = zone.dataset.cursor;
+      cur.style.transform = `translate(${e.clientX + 14}px, ${e.clientY + 14}px) rotate(-6deg)`;
+      cur.classList.add('on');
+    } else cur.classList.remove('on');
+    if (!ok()) return;
+    const mg = e.target.closest('.btn.cta');
+    if (mg) {
+      const r = mg.getBoundingClientRect();
+      to(mg, { x: (e.clientX - r.left - r.width / 2) * 0.25, y: (e.clientY - r.top - r.height / 2) * 0.35, duration: 0.3, ease: EASE, overwrite: 'auto' });
+    }
+  });
+  document.addEventListener('pointerout', (e) => {
+    if (!ok() || !e.target.closest) return;
+    const mg = e.target.closest('.btn.cta');
+    if (mg && !mg.contains(e.relatedTarget)) to(mg, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.45)', clearProps: 'transform' });
   });
 
   window.FX = { enter, nav, role, panel, stream, step, feedback, result, podium, reveal, swapText, bell, confetti, burstAt, celebrate, countUps, unlock, ok };

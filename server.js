@@ -149,13 +149,12 @@ app.get('/api/student/:id/home', (req, res) => {
   });
   const todo = lessons.filter((l) => !doneIds.has(l.id));
   const totalProgress = lessons.length ? Math.round((doneIds.size / lessons.length) * 100) : 0;
-  const deadlines = ['today', 'tomorrow', 'week'];
   res.json({
-    classesToday: 3,
+    lessonsDone: doneIds.size,
     tasksDue: todo.length,
     progress: totalProgress,
     courses: courseCards,
-    tasks: todo.slice(0, 4).map((l, i) => ({ lessonId: l.id, title: l.title, courseId: l.courseId, due: deadlines[Math.min(i, 2)] })),
+    tasks: todo.slice(0, 4).map((l) => ({ lessonId: l.id, title: l.title, courseId: l.courseId, steps: l.steps.length })),
   });
 });
 
@@ -238,7 +237,7 @@ app.post('/api/config', game.onlyTeacher, (req, res) => { ai.setMock(!!req.body.
 app.post('/api/reset', game.onlyTeacher, route(async (req, res) => { seed(); await game.clear(); res.json({ ok: true }); }));
 
 // Локально запускаем сервер сами, на Vercel он вызывает приложение как функцию
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
     console.log(`Платформа запущена: http://localhost:${PORT} (MOCK_AI=${ai.isMock()})`);
