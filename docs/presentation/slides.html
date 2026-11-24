@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>MVR Education Platform - презентация</title>
+<!-- Презентация для жюри. Дизайн-система сайта: те же цвета, шрифты, рамки, жёсткие тени и стикеры.
+     Собирается в PDF командой: node docs/presentation/build.mjs -->
+<style>
+  @font-face { font-family: "Unbounded"; font-weight: 200 900; src: url(../../public/vendor/fonts/unbounded-cyrillic-wght-normal.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: "Unbounded"; font-weight: 200 900; src: url(../../public/vendor/fonts/unbounded-latin-wght-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: "Literata"; font-style: italic; font-weight: 200 900; src: url(../../public/vendor/fonts/literata-cyrillic-wght-italic.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: "Literata"; font-style: italic; font-weight: 200 900; src: url(../../public/vendor/fonts/literata-latin-wght-italic.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: "Golos Text"; font-weight: 400 900; src: url(../../public/vendor/fonts/golos-text-cyrillic-wght-normal.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: "Golos Text"; font-weight: 400 900; src: url(../../public/vendor/fonts/golos-text-latin-wght-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 100 800; src: url(../../public/vendor/fonts/jetbrains-mono-cyrillic-wght-normal.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 100 800; src: url(../../public/vendor/fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+
+  /* Токены сайта */
+  :root {
+    --blue: #2b3bff; --lime: #d4ff3a; --coral: #ff5a36; --yellow: #ffc700; --ink: #111111; --cream: #fff8ec; --paper: #fffdf7;
+    --font: "Golos Text", sans-serif; --font-d: "Unbounded", sans-serif; --font-serif: "Literata", serif; --font-mono: "JetBrains Mono", monospace;
+    --r: 28px; --bw: 3px;
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.09'/></svg>");
+  }
+  @page { size: 1920px 1080px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #555; }
+  body { font-family: var(--font); color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1, h2, h3, p { margin: 0; }
+
+  .slide { position: relative; width: 1920px; height: 1080px; overflow: hidden; padding: 96px 112px; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .s-blue { background: var(--grain), var(--blue); color: var(--cream); }
+  .s-yellow { background: var(--grain), var(--yellow); }
+  .s-coral { background: var(--grain), var(--coral); }
+  .s-lime { background: var(--grain), var(--lime); }
+  .s-cream { background: var(--grain), var(--cream); }
+  .s-ink { background: var(--grain), var(--ink); color: var(--cream); }
+
+  /* Типографика */
+  .display { font-family: var(--font-d); font-weight: 800; letter-spacing: -0.045em; line-height: 0.95; }
+  .h { font-family: var(--font-d); font-weight: 800; font-size: 88px; line-height: 1; letter-spacing: -0.04em; }
+  .lead { font-size: 40px; line-height: 1.35; font-weight: 500; }
+  .label { font-family: var(--font-mono); font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  em { font-family: var(--font-serif); font-style: italic; font-weight: 500; letter-spacing: -0.01em; }
+  mark { background: linear-gradient(transparent 0 0.16em, var(--lime) 0.16em calc(100% - 0.02em), transparent calc(100% - 0.02em)); color: var(--ink); padding: 0 0.1em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .s-lime mark, .s-yellow mark.ink { background: linear-gradient(transparent 0 0.16em, var(--ink) 0.16em calc(100% - 0.02em), transparent calc(100% - 0.02em)); color: var(--lime); }
+
+  /* Элементы сайта */
+  .sticker { position: absolute; z-index: 3; display: inline-block; padding: 14px 30px; border: var(--bw) solid var(--ink); border-radius: 999px; background: var(--yellow); color: var(--ink); font-family: var(--font-mono); font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; box-shadow: 6px 6px 0 var(--ink); white-space: nowrap; }
+  .card { position: relative; border: var(--bw) solid var(--ink); border-radius: var(--r); background: var(--paper); box-shadow: 10px 10px 0 var(--ink); padding: 40px; color: var(--ink); }
+  .frame { position: relative; border: var(--bw) solid var(--ink); border-radius: var(--r); overflow: hidden; background: var(--paper); box-shadow: 14px 14px 0 var(--ink); }
+  .frame img { display: block; width: 100%; }
+  .crop { position: relative; overflow: hidden; border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 14px 14px 0 var(--ink); background: var(--cream); }
+  .crop img { display: block; position: absolute; left: 0; top: 0; }
+  .star { position: absolute; fill: var(--lime); }
+  .pill { display: inline-block; padding: 8px 22px; border: var(--bw) solid var(--ink); border-radius: 999px; background: var(--paper); font-family: var(--font-mono); font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink); }
+  .num { font-family: var(--font-d); font-weight: 800; letter-spacing: -0.05em; line-height: 0.9; }
+  .slide-no { position: absolute; right: 56px; bottom: 40px; font-family: var(--font-mono); font-size: 24px; font-weight: 700; opacity: .7; }
+
+  /* 1. Обложка */
+  .cover .display { font-size: 168px; margin-top: 64px; max-width: 1500px; }
+  .cover .slogan { margin-top: 56px; font-family: var(--font-d); font-weight: 800; font-size: 64px; letter-spacing: -0.04em; line-height: 1.1; }
+  .cover .team { position: absolute; left: 112px; bottom: 96px; display: flex; gap: 20px; }
+  .cover .team .pill { font-size: 26px; }
+  .cover .college { top: 96px; left: 112px; position: relative; display: inline-block; rotate: -3deg; box-shadow: 6px 6px 0 var(--ink); }
+
+  /* 2. Крючок */
+  .hook .time { font-family: var(--font-mono); font-weight: 800; font-size: 40px; letter-spacing: 0.06em; }
+  .hook .display { font-size: 112px; margin-top: 48px; max-width: 1560px; }
+  .hook .display .line { display: block; }
+
+  /* 3. Проблема */
+  .problem { display: grid; grid-template-columns: 1fr 640px; gap: 96px; align-items: center; }
+  .problem .h { font-size: 84px; }
+  .problem .bignum { padding: 48px; text-align: left; rotate: 2deg; }
+  .problem .bignum .num { font-size: 190px; color: var(--blue); }
+  .problem .bignum p { margin-top: 24px; font-size: 36px; line-height: 1.3; font-weight: 600; }
+
+  /* 4. Решение */
+  .solution { display: grid; grid-template-columns: 660px 1fr; gap: 80px; align-items: center; }
+  .solution .h { font-size: 76px; }
+  .solution .lead { margin-top: 40px; }
+
+  /* 5. Для кого */
+  .people { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; margin-top: 72px; }
+  .person { display: flex; flex-direction: column; gap: 24px; min-height: 560px; }
+  .person .av { width: 112px; height: 112px; border: var(--bw) solid var(--ink); border-radius: 50%; display: grid; place-items: center; font-family: var(--font-d); font-weight: 800; font-size: 40px; background: var(--lime); }
+  .person h3 { font-family: var(--font-d); font-weight: 800; font-size: 44px; letter-spacing: -0.03em; line-height: 1.05; }
+  .person .who { font-size: 28px; font-weight: 600; opacity: .85; }
+  .person .want { margin-top: auto; font-size: 38px; line-height: 1.25; font-weight: 600; }
+  .person.p2 { background: var(--grain), var(--blue); color: var(--cream); rotate: -1.5deg; }
+  .person.p2 .av { background: var(--yellow); color: var(--ink); }
+  .person.p3 { background: var(--grain), var(--ink); color: var(--cream); rotate: 1.5deg; }
+  .person.p3 .av { background: var(--coral); color: var(--ink); }
+
+  /* 6. Что есть на сайте: bento */
+  .bento { display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: 1fr 1fr; gap: 32px; margin-top: 48px; height: 760px; }
+  .cell { position: relative; border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 10px 10px 0 var(--ink); overflow: hidden; display: flex; flex-direction: column; }
+  .cell .shot { flex: 1; overflow: hidden; border-bottom: var(--bw) solid var(--ink); background: var(--cream); position: relative; }
+  .cell .shot img { position: absolute; left: 0; top: 0; }
+  .cell .cap { padding: 22px 28px; font-size: 30px; font-weight: 700; line-height: 1.2; }
+  .cell .cap b { font-family: var(--font-d); font-weight: 800; letter-spacing: -0.03em; display: block; font-size: 34px; margin-bottom: 4px; }
+  .c-a { grid-column: span 5; grid-row: span 2; background: var(--grain), var(--lime); }
+  /* Переписка на синем фоне панели Copilot: видны вопрос студента, ответ и заметка */
+  .cell .chat-shot { background: var(--grain), var(--blue); }
+  .cell .chat-shot img { position: absolute; left: 50%; top: -285px; width: 600px; translate: -50% 0; }
+  .c-b { grid-column: span 4; background: var(--grain), var(--yellow); }
+  .c-c { grid-column: span 3; background: var(--grain), var(--coral); }
+  .c-d { grid-column: span 4; background: var(--grain), var(--blue); color: var(--cream); }
+  .c-e { grid-column: span 3; background: var(--grain), var(--ink); color: var(--cream); justify-content: center; padding: 32px; }
+  .c-e .num { font-size: 88px; color: var(--lime); }
+  .c-e p { font-size: 30px; font-weight: 600; margin-top: 12px; line-height: 1.25; }
+
+  /* 7. Вау-момент */
+  .wow .h { font-size: 96px; max-width: 1500px; }
+  .wow .row { display: flex; align-items: center; gap: 72px; margin-top: 64px; }
+  .wow .arrow { width: 180px; height: 100px; flex: none; }
+  .wow .cap { font-family: var(--font-mono); font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 20px; }
+
+  /* 8. Цели */
+  .goals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 80px; }
+  .goal { min-height: 520px; display: flex; flex-direction: column; gap: 28px; }
+  .goal .when { font-family: var(--font-d); font-weight: 800; font-size: 56px; letter-spacing: -0.04em; line-height: 1; }
+  .goal p { font-size: 36px; line-height: 1.3; font-weight: 600; }
+  .goal.g1 { background: var(--paper); }
+  .goal.g2 { background: var(--grain), var(--blue); color: var(--cream); rotate: -1deg; }
+  .goal.g3 { background: var(--grain), var(--ink); color: var(--cream); rotate: 1deg; }
+  .goal .chev { position: absolute; right: -52px; top: 50%; width: 48px; height: 48px; translate: 0 -50%; z-index: 2; fill: var(--ink); }
+
+  /* 9. Команда */
+  .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; margin-top: 64px; }
+  .member { min-height: 600px; display: flex; flex-direction: column; gap: 20px; }
+  .member .av { width: 128px; height: 128px; border: var(--bw) solid var(--ink); border-radius: 50%; display: grid; place-items: center; font-family: var(--font-d); font-weight: 800; font-size: 44px; background: var(--paper); color: var(--ink); }
+  .member h3 { font-family: var(--font-d); font-weight: 800; font-size: 48px; letter-spacing: -0.035em; line-height: 1.02; margin-top: 8px; }
+  .member .pill { align-self: flex-start; }
+  .member .quote { margin-top: auto; font-family: var(--font-serif); font-style: italic; font-size: 38px; line-height: 1.25; }
+  .member.m1 { background: var(--grain), var(--blue); color: var(--cream); }
+  .member.m2 { background: var(--grain), var(--coral); rotate: -1.2deg; }
+  .member.m3 { background: var(--grain), var(--lime); rotate: 1.2deg; }
+
+  /* 10. Финал */
+  .final { display: grid; grid-template-columns: 1fr 520px; gap: 96px; align-items: center; }
+  .final .display { font-size: 112px; }
+  .final .thanks { margin-top: 64px; font-family: var(--font-d); font-weight: 800; font-size: 96px; color: var(--lime); letter-spacing: -0.04em; }
+  .final .qr { padding: 44px; text-align: center; rotate: 2deg; }
+  .final .qr img { width: 100%; display: block; }
+  .final .qr p { margin-top: 24px; font-family: var(--font-mono); font-size: 28px; font-weight: 800; }
+</style>
+</head>
+<body>
+
+<!-- 1. Обложка -->
+<section class="slide s-blue cover">
+  <span class="pill college" style="position:relative;top:0;left:0;background:var(--yellow)">Caspian College</span>
+  <h1 class="display">MVR Education Platform</h1>
+  <p class="slogan">Copilot подскажет. <mark>Решать будешь ты.</mark></p>
+  <div class="team"><span class="pill">Руслана Садыкова</span><span class="pill">Мария Кругликова</span><span class="pill">Виктория Бикинеева</span></div>
+  <svg class="star" style="right:-120px;bottom:-160px;width:640px;height:640px" viewBox="0 0 24 24"><path d="M12 0l3.2 8.8L24 12l-8.8 3.2L12 24l-3.2-8.8L0 12l8.8-3.2z"/></svg>
+</section>
+
+<!-- 2. Крючок -->
+<section class="slide s-yellow hook">
+  <p class="time">23:40 · ЗАВТРА СДАЧА</p>
+  <h2 class="display">
+    <span class="line">Copilot решил задачу за&nbsp;секунды.</span>
+    <span class="line" style="margin-top:32px">Через неделю контрольная.</span>
+    <span class="line" style="margin-top:32px"><mark class="ink">В голове пусто.</mark></span>
+  </h2>
+  <span class="sticker" style="right:112px;top:96px;rotate:6deg;background:var(--coral)">Знакомо?</span>
+  <span class="slide-no">02</span>
+</section>
+
+<!-- 3. Проблема -->
+<section class="slide s-coral problem">
+  <div>
+    <p class="label">Проблема</p>
+    <h2 class="h" style="margin-top:32px">Колледж платит за Copilot. А им <em>списывают</em> или не&nbsp;открывают вовсе.</h2>
+  </div>
+  <div class="card bignum">
+    <div class="num">67%</div>
+    <p>лицензий Copilot в колледже не используется</p>
+  </div>
+  <span class="slide-no">03</span>
+</section>
+
+<!-- 4. Решение -->
+<section class="slide s-cream solution">
+  <div>
+    <p class="label">Решение</p>
+    <h2 class="h" style="margin-top:32px">Платформа, где ИИ <em>учит</em>, а&nbsp;не&nbsp;решает.</h2>
+    <p class="lead">Уроки, Copilot-подсказки, отчёты и рейтинг - в одном сайте.</p>
+  </div>
+  <div class="frame" style="rotate:1.5deg"><img src="img/home.jpg" alt="Главная страница студента"></div>
+  <span class="sticker" style="right:150px;top:150px;rotate:-6deg">Живой сайт</span>
+  <span class="slide-no">04</span>
+</section>
+
+<!-- 5. Для кого -->
+<section class="slide s-lime">
+  <p class="label">Для кого</p>
+  <h2 class="h" style="margin-top:24px">Три героя одной пары</h2>
+  <div class="people">
+    <div class="card person p1"><div class="av">ВК</div><h3>Виктория</h3><p class="who">студентка, группа ПО 24-2</p><p class="want">Хочет понять тему, а не скопировать ответ.</p></div>
+    <div class="card person p2"><div class="av">АС</div><h3>Айгерим</h3><p class="who">преподаватель информатики</p><p class="want">Хочет готовить урок за вечер, а не за выходные.</p></div>
+    <div class="card person p3"><div class="av">CC</div><h3>Колледж</h3><p class="who">Caspian College</p><p class="want">Хочет, чтобы купленный Copilot работал на учёбу.</p></div>
+  </div>
+  <span class="sticker" style="right:112px;top:110px;rotate:5deg;background:var(--paper)">герои из демо</span>
+  <span class="slide-no">05</span>
+</section>
+
+<!-- 6. Что есть на сайте -->
+<section class="slide s-cream">
+  <h2 class="h" style="font-size:80px">Всё для пары - <mark>в&nbsp;одном месте</mark></h2>
+  <div class="bento">
+    <div class="cell c-a">
+      <!-- Только переписка: вопрос студента, подсказка Copilot и заметка преподавателю -->
+      <div class="shot chat-shot"><img src="img/chat.jpg" alt="Переписка студента с Copilot"></div>
+      <div class="cap"><b>Урок с Copilot</b>Шаг за шагом, подсказка рядом</div>
+    </div>
+    <div class="cell c-b">
+      <div class="shot"><img src="img/teacher-draft.jpg" alt="Черновик урока" style="width:1000px;left:-245px;top:-20px"></div>
+      <div class="cap"><b>Урок за минуты</b>Тема на входе - урок на выходе</div>
+    </div>
+    <div class="cell c-c">
+      <div class="shot"><img src="img/rating.jpg" alt="Рейтинг" style="width:900px;left:-230px;top:-150px"></div>
+      <div class="cap"><b>Рейтинг</b>Месяц учёбы - место на пьедестале</div>
+    </div>
+    <div class="cell c-d">
+      <div class="shot"><img src="img/game-quiz.jpg" alt="Открытый урок" style="width:960px;left:-250px;top:-410px"></div>
+      <div class="cap"><b>Открытый урок</b>Квиз и квест командами</div>
+    </div>
+    <div class="cell c-e"><div class="num">Word<br>Excel</div><p>Отчёт и оценки в один клик</p></div>
+  </div>
+  <span class="slide-no">06</span>
+</section>
+
+<!-- 7. Вау-момент -->
+<section class="slide s-blue wow">
+  <h2 class="h">Copilot <mark>не даёт ответ.</mark> Он&nbsp;<em>ведёт</em>.</h2>
+  <div class="row">
+    <div>
+      <p class="cap">Студент спрашивает</p>
+      <div class="crop" style="width:540px;height:620px;rotate:-1.5deg"><img src="img/lesson-chat.jpg" alt="Чат с Copilot" style="width:1980px;left:-1365px;top:-130px"></div>
+    </div>
+    <svg class="arrow" viewBox="0 0 180 100"><path d="M0 50h140" stroke="#d4ff3a" stroke-width="14" fill="none"/><path d="M120 10l55 40-55 40z" fill="#d4ff3a"/></svg>
+    <div>
+      <p class="cap">Преподаватель видит, где урок не понятен</p>
+      <div class="crop" style="width:780px;height:620px;rotate:1.5deg"><img src="img/teacher-gaps.jpg" alt="Недочёты урока у преподавателя" style="width:1920px;left:-470px;top:-400px"></div>
+    </div>
+  </div>
+  <span class="sticker" style="left:720px;top:215px;rotate:-5deg;background:var(--lime)">вопрос = правка урока</span>
+  <span class="slide-no">07</span>
+</section>
+
+<!-- 8. Цели -->
+<section class="slide s-yellow">
+  <p class="label">Цели</p>
+  <h2 class="h" style="margin-top:24px">Куда идём</h2>
+  <div class="goals">
+    <div class="card goal g1"><div class="when">Сейчас</div><p>Работающий сайт: уроки с ИИ-помощником, рейтинг, командная игра, русский и казахский.</p>
+      <svg class="chev" viewBox="0 0 24 24"><path d="M6 2l12 10-12 10z"/></svg></div>
+    <div class="card goal g2"><div class="when">3 месяца</div><p>Пилот в Caspian College: [ЦИФРА] групп и подключение Microsoft Copilot.</p>
+      <svg class="chev" viewBox="0 0 24 24"><path d="M6 2l12 10-12 10z"/></svg></div>
+    <div class="card goal g3"><div class="when">Год</div><p>[ЦИФРА] колледжей и отчёт: как Copilot влияет на оценки.</p></div>
+  </div>
+  <span class="slide-no">08</span>
+</section>
+
+<!-- 9. Команда -->
+<section class="slide s-cream">
+  <h2 class="h">Команда</h2>
+  <div class="team-grid">
+    <div class="card member m1"><div class="av">РС</div><h3>Руслана Садыкова</h3><span class="pill">спикер · backend</span>
+      <p class="quote">«Собрала сервер: уроки, оценки, рейтинг и командную игру.»</p></div>
+    <div class="card member m2"><div class="av">МК</div><h3>Мария Кругликова</h3><span class="pill">frontend · дизайн</span>
+      <p class="quote">«Придумала яркий интерфейс и сверстала его от меню до телефона.»</p></div>
+    <div class="card member m3"><div class="av">ВБ</div><h3>Виктория Бикинеева</h3><span class="pill">функционал · деплой</span>
+      <p class="quote">«Подключила ИИ и выложила сайт в интернет.»</p></div>
+  </div>
+  <span class="sticker" style="right:112px;top:104px;rotate:5deg">Caspian College</span>
+  <span class="slide-no">09</span>
+</section>
+
+<!-- 10. Финал -->
+<section class="slide s-ink final">
+  <div>
+    <h2 class="display">ИИ должен делать студентов <mark>умнее</mark>, а&nbsp;не&nbsp;ленивее.</h2>
+    <p class="thanks">Спасибо!</p>
+  </div>
+  <div class="card qr"><img src="img/qr.svg" alt="QR-код на сайт"><p>ideaton-one.vercel.app</p></div>
+  <span class="sticker" style="right:150px;top:120px;rotate:-6deg;background:var(--lime)">Попробуйте сами</span>
+</section>
+
+</body>
+</html>
