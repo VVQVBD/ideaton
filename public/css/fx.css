@@ -185,6 +185,7 @@ button, [data-act], .filter, .nav-item, .lesson-card, .course-card, .task { curs
 
   .panel { position: static; transform: none; height: calc(100vh - 32px); max-width: none; margin: 0; padding: 0; }
   .fab, .scrim, .cop-close { display: none; }
+  body:not(.auth-mode)::after { display: none; }
   .toasts { bottom: var(--s-3); width: auto; }
 
   .marquee { margin-inline: calc(-1 * var(--mp)); }

@@ -142,7 +142,7 @@ mark { background: linear-gradient(transparent 0 0.2em, var(--lime) 0.2em calc(1
 .c-ink { background: var(--grain), var(--ink-block); color: var(--cream); }
 
 /* ---------- Каркас (телефон): меню внизу, Copilot выезжает снизу ---------- */
-.app { position: relative; z-index: 1; overflow-x: clip; padding: var(--s-2) var(--s-2) var(--nav-space); }
+.app { position: relative; overflow-x: clip; padding: var(--s-2) var(--s-2) var(--nav-space); }
 .center { min-width: 0; max-width: 980px; margin: 0 auto; }
 .main { padding: var(--s-2) 0 var(--s-5); container: main / inline-size; }
 
@@ -178,6 +178,7 @@ body.panel-open .scrim { opacity: 1; pointer-events: auto; }
 .fab:active { translate: 2px 2px; box-shadow: 1px 1px 0 var(--hard); }
 .fab .ic { width: 26px; height: 26px; }
 body.panel-open .fab { display: none; }
+body:not(.auth-mode)::after { content: ""; position: fixed; z-index: 49; left: 0; right: 0; bottom: 0; height: calc(var(--nav-h) + var(--nav-gap) * 2 + env(safe-area-inset-bottom)); background: var(--page); pointer-events: none; }
 .cop-close { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border: var(--bw) solid var(--ink); border-radius: 50%; background: var(--paper); color: var(--ink); }
 
 /* ---------- Верхняя панель ---------- */
@@ -442,12 +443,15 @@ button.cell { font: inherit; }
 .big-gap { font-family: var(--font-d); font-size: 64px; font-weight: 800; line-height: 1; color: var(--coral); }
 
 /* ---------- Формы ---------- */
-.form { display: grid; gap: var(--s-3); }
+.form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+/* Поля не растягивают форму под длинный текст внутри */
+.field-l, .step-edit > * { min-width: 0; }
+.form > .row { flex-wrap: wrap; }
 .field-l { display: flex; flex-direction: column; gap: var(--s-1); font-family: var(--font-mono); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
-.field-l input, .field-l textarea, .field-l select, .step-edit textarea { padding: 14px 16px; border: var(--bw) solid var(--line); border-radius: var(--r-sm); background: var(--surface); outline: 0; font-family: var(--font); font-size: 16px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--fg); transition: box-shadow var(--t-fast) var(--ease); }
+.field-l input, .field-l textarea, .field-l select, .step-edit textarea { padding: 14px 16px; border: var(--bw) solid var(--line); border-radius: var(--r-sm); background: var(--surface); outline: 0; font-family: var(--font); font-size: 16px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--fg); width: 100%; min-width: 0; transition: box-shadow var(--t-fast) var(--ease); }
 .field-l textarea, .step-edit textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
 .field-l input:focus, .field-l textarea:focus, .field-l select:focus, .step-edit textarea:focus { box-shadow: 4px 4px 0 var(--blue); }
-.step-edit { display: grid; gap: var(--s-2); padding: var(--s-2); border: var(--bw) solid var(--line); border-radius: 20px; background: var(--cream-2); color: var(--ink); }
+.step-edit { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); padding: var(--s-2); border: var(--bw) solid var(--line); border-radius: 20px; background: var(--cream-2); color: var(--ink); }
 :root[data-theme="dark"] .step-edit { background: var(--ink-soft); color: var(--cream); }
 .step-edit .chip { justify-self: start; }
 

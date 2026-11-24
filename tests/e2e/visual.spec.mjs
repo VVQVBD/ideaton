@@ -75,3 +75,20 @@ test('меню не перекрывает конец страницы', async (
     if (r.fixed) expect(r.lastBottom, url).toBeLessThanOrEqual(r.navTop);
   }
 });
+
+test('черновик урока не шире экрана (длинные тексты в полях)', async ({ page, request }) => {
+  await login(page, request, 'teacher');
+  await page.goto('/#/create');
+  await ready(page);
+  await page.locator('[data-form="topic"]').fill('Базовые SQL-запросы для работы с реляционными базами данных');
+  await page.locator('[data-act="generate"]').click();
+  await expect(page.locator('[data-act="publish"]')).toBeVisible({ timeout: 20_000 });
+  const tooWide = await page.evaluate(() => {
+    const main = document.getElementById('main');
+    const limit = Math.min(document.documentElement.clientWidth, main.getBoundingClientRect().right);
+    return [...main.querySelectorAll('input, textarea, .step-edit, .form, .btn')]
+      .filter((el) => el.getBoundingClientRect().right > limit + 1)
+      .map((el) => el.tagName + '.' + el.className);
+  });
+  expect(tooWide).toEqual([]);
+});
